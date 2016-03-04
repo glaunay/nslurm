@@ -1,5 +1,5 @@
 {
-  "name": "nSlurm",
+  "name": "nslurm",
   "version": "0.0.0",
   "description": "A library to communicate with a slurm scheduler/engine on HPC",
   "main": "index.js",

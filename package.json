@@ -1,0 +1,25 @@
+{
+  "name": "nSlurm",
+  "version": "0.0.0",
+  "description": "A library to communicate with a slurm scheduler/engine on HPC",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/glaunay/nSlurm.git"
+  },
+  "keywords": [
+    "node",
+    "slurm"
+  ],
+  "author": "glaunay, pitooon@gmail.com",
+  "license": "BSD",
+  "bugs": {
+    "url": "https://github.com/glaunay/nSlurm/issues"
+  },
+  "dependencies": {
+    "node-uuid": "^1.4.7"
+  }
+}

@@ -76,14 +76,17 @@ module.exports = {
     * @return {EventEmitter} jobEmitter
     */
     push : function(jobOpt) {
+        //console.log("jobOpt");
+        //console.log(jobOpt);
         var self = this;
-        var partition, qos = null;
-        if (jobOpt.gid) {
-            if (jobOpt.gid === "ws_users") {
-                partition = 'ws-dev';
-                qos = 'ws-dev';
-            }
-        }
+        // var partition, qos = null;
+        // if (jobOpt.gid) {
+        //     if (jobOpt.gid === "ws_users") {
+        //         partition = 'ws-dev';
+        //         qos = 'ws-dev';
+        //     }
+        // }
+
         var newJob = jobLib.createJob({
             'emulated' : emulator ? true : false,
             'id' : 'id' in jobOpt ? jobOpt.id : null,
@@ -93,16 +96,18 @@ module.exports = {
             'rootDir' : cacheDir,
             'adress' : TCPip, 'port' : TCPport,
             'ttl' : 50000,
-            'gid' : jobOpt.gid,
-            'uid' : jobOpt.uid,
-            'partition' : partition,
-            'qos' : qos,
+            'gid' : 'gid' in jobOpt ? jobOpt.gid : null,
+            'uid' : 'uid' in jobOpt ? jobOpt.uid : null,
+            'partition' : 'partition' in jobOpt ? jobOpt.partition : null,
+            'qos' : 'qos' in  jobOpt ? jobOpt.qos : null,
             'cmd' : 'cmd' in jobOpt ? jobOpt.cmd : null,
             'script' : 'script' in jobOpt ? jobOpt.script : null,
             'exportVar' : 'exportVar' in jobOpt ? jobOpt.exportVar : null,
             'tWall' : 'tWall' in jobOpt ? jobOpt.tWall : null,
             'nNodes' : 'nNodes' in jobOpt ? jobOpt.nNodes : null,
-            'nCpu' : 'nCpu' in jobOpt ? jobOpt.nCpu : null,
+            'nCores' : 'nCores' in jobOpt ? jobOpt.nCores : null,
+            'modules' : 'modules' in jobOpt ? jobOpt.modules : null,
+            'gres' : 'gres' in jobOpt ? jobOpt.gres : null
         });
         jobsArray[newJob.id] = { 'obj' : newJob, 'status' : 'CREATED' };
 

@@ -1,6 +1,6 @@
 {
   "name": "nslurm",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "A library to communicate with a slurm scheduler/engine on HPC",
   "main": "index.js",
   "scripts": {
@@ -14,7 +14,7 @@
     "node",
     "slurm"
   ],
-  "author": "glaunay, pitooon@gmail.com",
+  "author": "glaunay, pitooon@gmail.com and mgarnier, melanie.mc.garnier@gmail.com",
   "license": "BSD",
   "bugs": {
     "url": "https://github.com/glaunay/nSlurm/issues"

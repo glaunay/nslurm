@@ -38,15 +38,15 @@ var sbatchDumper = function (job){
 // User' specific sbatch parameters, TO BE COMPLETED
         var nNodes = job.hasOwnProperty('nNodes') ? job.nNodes ? job.nNodes : 1 : 1;
         string += "#SBATCH -N " + nNodes + " # Number of nodes, aka number of worker \n"
-        var nCpu = job.hasOwnProperty('nCpu') ? job.nCpu ? job.nCpu : 1 : 1;
-        string += "#SBATCH -n " + nCpu + " # number of task, ie core\n"
+        var nCores = job.hasOwnProperty('nCores') ? job.nCores ? job.nCores : 1 : 1;
+        string += "#SBATCH -n " + nCores + " # number of task, ie core\n"
 
         var tWall = job.hasOwnProperty('tWall') ? job.tWall  ? job.tWall : '0-00:05' : '0-00:05';
         string += "#SBATCH -t " + tWall + " # Runtime in D-HH:MM\n";
         var qos = job.hasOwnProperty('qos') ? job.qos : 'mobi-express';
         var partition = job.hasOwnProperty('partition') ? job.partition : 'mobi-express';
         string += "#SBATCH -p " + partition + " # Partition to submit to\n"
-                + "#SBATCH --qos=" + qos + " # Partition to submit to\n";
+                + "#SBATCH --qos " + qos + " # Partition to submit to\n";
 
         var stdout = job.hasOwnProperty('out') ? job.out : job.id + ".out";
         string += "#SBATCH -o " + stdout + "\n";
@@ -59,10 +59,18 @@ var sbatchDumper = function (job){
         if (job.hasOwnProperty('uid')) {
             string += "#SBATCH --uid " + job.uid + "\n";
         }
+        if (job.gres != null) {
+            string += "#SBATCH --gres=" + job.gres + "\n";
+        }
+
+        // NEW to load the modules
+        job.modules.forEach(function(e){
+            string += "module load " + e + '\n';
+        });
 
 // Sbatch command content
         string += 'echo -n  "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + job.adress + ' ' + job.port + " > /dev/null\n"
-        if (qos === "ws-dev") {
+        if (qos === "ws-dev" || qos === "gpu") { // NEW condition for GPU TODO
             string += "source /etc/profile.d/modules_cluster.sh\n";
             string += "source /etc/profile.d/modules.sh\n";
         }
@@ -88,6 +96,7 @@ var sbatchDumper = function (job){
         string += '. ' + fname + '\n' + trailer;
         _copyScript(job, fname, string, emitter);
 
+    // just for tests
     } else {
         job.modules.forEach(function(e){
             string += "module load " + e;
@@ -98,7 +107,6 @@ var sbatchDumper = function (job){
             emitter.emit('ready', string);
         }, 5);
     }
-
     return emitter;
 }
 
@@ -158,7 +166,8 @@ var Job = function (opt) {
     Core.call(this, opt);
 
     this.ttl = opt.ttl; //default ttl is 5000ms
-    this.modules = []
+    this.modules = opt.modules; // module load ...
+    this.gres = opt.gres; // gres sbatch option for GPU
     this.cmd = 'cmd' in opt ? opt.cmd : null; //the set of shell command to sbatch
     this.script = 'script' in opt ? opt.script : null; //the shell script to sbatch
     this.exportVar = 'exportVar' in opt ? opt.exportVar : null; //the shell script variable to export
@@ -196,7 +205,6 @@ Job.prototype.constructor = Job;
 Job.prototype.setUp = function(data) {
     var self = this;
     var customCmd = false;
-
     this.emulated = 'emulated' in data ? data.emulated ? true : false :false;
 
     if ('partition' in data){
@@ -217,12 +225,19 @@ Job.prototype.setUp = function(data) {
     if ('nNodes' in data){
         this.nNodes = data.nNodes;
     }
-    if ('nCpu' in data){
-        this.nCpu = data.nCpu;
+    if ('nCores' in data){
+        this.nCores = data.nCores;
     }
     if ('tWall' in data){
         this.tWall = data.tWall;
     }
+    if ('modules' in data){
+        this.modules = data.modules;
+    }
+    if ('gres' in data){
+        this.gres = data.gres;
+    }
+
     sbatchDumper(this).on('ready', function (string){
         var fname = self.workDir + '/' + self.id + '.sbatch';
         if (self.emulated) fname = self.workDir + '/' + self.id + '.sh';
@@ -231,6 +246,7 @@ Job.prototype.setUp = function(data) {
                 return console.log(err);
             }
             console.log("sbatch command written to " + fname);
+            //process.exit();
             if (self.emulated)
                 self.fork(fname);
             else
@@ -246,14 +262,16 @@ Job.prototype.submit = function(fname) {
     // shell command
     //console.log(this.sbatch + ' ' + fname + ' ' + this.workDir);
     var sbatchArgArray = [fname];
-    if (this.export) {
-        var expString = '--export=';
-        expString += Object.keys(this.export).join(',');
-        sbatchArgArray.push(expString);
-    }
+
+    // USELESS : no "export" variable in Job object
+    //if (this.export) {
+    //    var expString = '--export=';
+    //    expString += Object.keys(this.export).join(',');
+    //    sbatchArgArray.push(expString);
+    //}
+
     console.log('sbatch w/, ' + this.sbatch + sbatchArgArray);
-    var process = spawn(this.sbatch, sbatchArgArray,
-                 { 'cwd' : this.workDir });
+    var process = spawn(this.sbatch, sbatchArgArray, { 'cwd' : this.workDir });
 
     this.emitter.emit('submitted', this);
 }

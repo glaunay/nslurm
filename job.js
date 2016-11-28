@@ -214,7 +214,7 @@ Job.prototype.setUp = function(data) {
         this.qos = data.qos;
     }
     if ('cmd' in data) {
-        this.cmd = data.cmd
+        this.cmd = data.cmd;
     }
     if ('uid' in data){
         this.uid = data.uid;

@@ -24,9 +24,53 @@ var exhaustBool = false; // set to true at any push, set to false at exhausted e
 
 var emulator = false; // Trying to keep api/events intact while running job as fork on local
 
-
-//
 var isStarted = false;
+
+
+
+/**
+* List all the job ids of slurm that are both in this process and in the squeue command.
+* Only used in the stop function.
+* Caution : the ids or not listed in order.
+*/
+var _listSlurmJobID = function() {
+    var emitter = new events.EventEmitter();
+
+    // run squeue command
+    var exec_cmd = require('child_process').exec;
+    exec_cmd(squeuePath + ' -o \"\%j \%i\"', function (err, stdout, stderr) {
+        if (err) {
+            emitter.emit('errSqueue', err);
+            return;
+        }
+        // list of slurmIDs of the jobs to kill
+        var toKill = new Array();
+
+        // squeue results
+        var squeueIDs = ('' + stdout).replace(/\"/g, '');
+        // regex
+        var reg_NslurmID = new RegExp ('^ardockTask_[a-z0-9-]+_hex_[0-9]{1,2}', 'i');
+        var reg_slurmID = new RegExp ('[0-9]+$');
+            
+        // for each job in the squeue
+        squeueIDs.split('\n').forEach (function (line) {
+            // use the regex
+            if (reg_NslurmID.test(line) && reg_slurmID.test(line)) {
+                var NslurmID = reg_NslurmID.exec(line);
+                var slurmID = reg_slurmID.exec(line);
+                // in case we found NslurmID in the jobs of our process
+                if (jobsArray.hasOwnProperty(NslurmID)) {
+                    console.log('Job ' + slurmID + ' must be killed');
+                    toKill.push(slurmID[0]);
+                }
+            }
+        });
+        if (toKill.length === 0) emitter.emit('finished');
+        else emitter.emit('jobLeft', toKill);
+    });
+    return emitter;
+}
+
 
 
 /**
@@ -180,6 +224,53 @@ module.exports = {
             _pulse();});*/
 
     },
+
+
+
+    /**
+    * Try to kill all sbatch jobs of this process,
+    * by viewing the jobIds defined in nslurm, 
+    * and comparing them to the jobIds defined in slurm.
+    * It needs to use the squeue and scancel commands.
+    */
+    stop : function(bean) {
+        var self = this;
+        var emitter = new events.EventEmitter();
+        
+        // define squeue and scancel pathways
+        if ('slurmBinaries' in bean.managerSettings) {
+            squeuePath = bean.managerSettings['slurmBinaries'] + '/squeue';
+            scancelPath = bean.managerSettings['slurmBinaries'] + '/scancel';
+        }
+        //console.log('Jobs of this process : ' + Object.keys(jobsArray));
+
+        _listSlurmJobID()
+        .on('errSqueue', function (data) {
+            console.log('Error for squeue command : ' + data);
+            emitter.emit('errSqueue');
+        })
+        .on('finished', function () {
+            console.log('All jobs are already killed');
+            emitter.emit('cleanExit');
+        })
+        .on('jobLeft', function (toKill) {
+            // run scancel command
+            console.log('Try to cancel the job ' + toKill);
+            var exec_cmd = require('child_process').exec;
+            exec_cmd(scancelPath + ' ' + toKill.join(' '), function (err, stdout, stderr) {
+                if (err) {
+                    console.log('Error for scancel command : ' + err);
+                    emitter.emit('errScancel');
+                    return;
+                }
+                console.log('End of trying to kill the jobs : ' + toKill);
+                emitter.emit('exit');
+            });
+        });
+        return emitter;
+    },
+
+
     set_id : function (val){
         id = val
     },
@@ -202,6 +293,7 @@ module.exports = {
             console.log('child process exited with code ' + code);
         });
     },
+
     /**
     * Perform a squeue call,
     *
@@ -230,8 +322,10 @@ module.exports = {
         });
 
     //return String("This is a squeue");
-  }
+    }
+
 };
+
 
 // Private Module functions
 

@@ -51,7 +51,7 @@ var _listSlurmJobID = function() {
         // regex
         var reg_NslurmID = new RegExp ('^ardockTask_[a-z0-9-]+_hex_[0-9]{1,2}', 'i');
         var reg_slurmID = new RegExp ('[0-9]+$');
-            
+
         // for each job in the squeue
         squeueIDs.split('\n').forEach (function (line) {
             // use the regex
@@ -229,14 +229,14 @@ module.exports = {
 
     /**
     * Try to kill all sbatch jobs of this process,
-    * by viewing the jobIds defined in nslurm, 
+    * by viewing the jobIds defined in nslurm,
     * and comparing them to the jobIds defined in slurm.
     * It needs to use the squeue and scancel commands.
     */
     stop : function(bean) {
         var self = this;
         var emitter = new events.EventEmitter();
-        
+
         // define squeue and scancel pathways
         if ('slurmBinaries' in bean.managerSettings) {
             squeuePath = bean.managerSettings['slurmBinaries'] + '/squeue';
@@ -330,15 +330,19 @@ module.exports = {
 // Private Module functions
 
 function _parseMessage(string) {
-    //console.log("tryong to parse " + string);
+    //console.log("trying to parse " + string);
     var re = /^JOB_STATUS[\s]+([\S]+)[\s]+([\S]+)$/
     var matches = string.match(re);
     if (! matches) return;
 
     var jid = matches[1];
     var uStatus = matches[2];
-    if (! jid in jobsArray)
-        throw 'unregistred job id ' + jid;
+    if (!jobsArray.hasOwnProperty(jid)) {
+        console.log('unregistred job id ' + jid);
+        eventEmitter.emit('unregistredJob', jid);
+        return;
+        //throw 'unregistred job id ' + jid;
+    }
 
     console.log('Status Updating [job ' + jid + ' ] : from \'' +
                 jobsArray[jid].status  + '\' to \'' + uStatus + '\'');

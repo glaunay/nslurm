@@ -2,6 +2,9 @@ var events = require('events');
 var uuid = require('node-uuid');
 var fs = require('fs');
 var spawn = require('child_process').spawn;
+var chalk = require('chalk');
+
+
 
 var _copyScript = function (job, fname, string, emitter) {
 
@@ -63,6 +66,11 @@ var sbatchDumper = function (job){
             string += "#SBATCH --gres=" + job.gres + "\n";
         }
 
+        if (qos === "ws-dev" || qos === "gpu") { // NEW condition for GPU TODO
+            string += "source /etc/profile.d/modules_cluster.sh\n";
+            string += "source /etc/profile.d/modules.sh\n";
+        }
+
         // NEW to load the modules
         job.modules.forEach(function(e){
             string += "module load " + e + '\n';
@@ -70,10 +78,7 @@ var sbatchDumper = function (job){
 
 // Sbatch command content
         string += 'echo -n  "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + job.adress + ' ' + job.port + " > /dev/null\n"
-        if (qos === "ws-dev" || qos === "gpu") { // NEW condition for GPU TODO
-            string += "source /etc/profile.d/modules_cluster.sh\n";
-            string += "source /etc/profile.d/modules.sh\n";
-        }
+
     } else { // wrapper sbatch script for local/fork usage
         string += 'echo -n  "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n"
        // string += 'WORKDIR=' + job.cwd;
@@ -308,12 +313,34 @@ Job.prototype.emit = function(){
     }
     //console.log(argArray)
     this.emitter.emit.apply(this.emitter, argArray);
-
 }
+
 Job.prototype.stdout = function() {
     if (this.emulated) return this.stdio;
     var fNameStdout = this.hasOwnProperty('out') ? this.out : this.id + ".out";
-    var stream = fs.createReadStream(this.workDir +'/' + fNameStdout,  {'encoding' : 'utf8'});
+    var fPath = this.workDir +'/' + fNameStdout;
+
+    if (! fs.existsSync(fPath)) {
+        console.log("cant find file " + fPath);
+        console.log("forcing synchronicity...");
+        fs.readdirSync(this.workDir).forEach(function(fn){
+            console.log("ddirSync : " + fn);
+        });
+    }
+    if (! fs.existsSync(fPath)) {
+        console.log("Output file error, Still cant open output file, returning empy stream");
+        var Readable = require('stream').Readable;
+        var dummyStream = new Readable();
+        dummyStream.push(null);
+        return dummyStream;
+    }
+
+    var stream = fs.createReadStream(fPath,  {'encoding' : 'utf8'})
+    .on('error', function(m){
+        var d = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '')
+        console.log("[" + d + "] An error occured while creating read stream " + fPath);
+        console.log(m);
+    });
     //stream.on("open", function(){ console.log("stdout stream opened");});
     //stream.on("end", function(){console.log('this is stdout END');});
     return stream;

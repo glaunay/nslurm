@@ -186,31 +186,40 @@ module.exports = {
         TCPip = opt.tcp;
         TCPport = opt.port;
 
+
         if ('slurmBinaries' in opt) {
             sbatchPath = opt['slurmBinaries'] + '/sbatch';
             squeuePath = opt['slurmBinaries'] + '/squeue';
         }
-        console.log("Creating cache for process at " + cacheDir);
-        fs.mkdir(cacheDir, function (err) {
-            if (err)
-                throw 'failed to create directory' + err;
 
-            console.log('[' + TCPip + '] opening socket at port ' + TCPport);
-            var s = _openSocket(TCPport);
-            data = '';
-            s.on('listening',function(socket){
-                eventEmitter.emit("ready");
-                isStarted = true;
-                console.log("Starting pulse monitoring");
-                console.log("cache Directory is " + cacheDir);
-                core = setInterval(function(){_pulse()},500);
+        if (opt.hasOwnProperty('forceCache')) {
+            cacheDir = opt.forceCache;
+        }
+
+        console.log("Attempting to create cache for process at " + cacheDir);
+        try {
+            fs.mkdirSync(cacheDir);
+        } catch(e) {
+            if ( e.code != 'EEXIST' ) throw e;
+            console.log("Cache found already found at " + cacheDir);
+        }
+
+        console.log('[' + TCPip + '] opening socket at port ' + TCPport);
+        var s = _openSocket(TCPport);
+        data = '';
+        s.on('listening',function(socket){
+            eventEmitter.emit("ready");
+            isStarted = true;
+            console.log("Starting pulse monitoring");
+            console.log("cache Directory is " + cacheDir);
+            core = setInterval(function(){_pulse()},500);
 
             /*socket.on('data', function (chunk) {
                 data += chunk.toString();
                 console.log(chunk.toString());
             })*/
-            })
-            .on('data', function(data){ // TO RESUME HERE
+        })
+        .on('data', function(data){ // TO RESUME HERE
                 _parseMessage(data);
             // parse job id
 
@@ -218,10 +227,7 @@ module.exports = {
 
             //raise the "finish" event in job.emit("finish");
 
-            });
         });
-        /*socket.on('open',function(){
-            _pulse();});*/
 
     },
 

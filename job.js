@@ -66,7 +66,7 @@ var sbatchDumper = function (job){
             string += "#SBATCH --gres=" + job.gres + "\n";
         }
 
-        if (qos === "ws-dev" || qos === "gpu") { // NEW condition for GPU TODO
+        if (qos === "ws-dev" || qos === "gpu" || qos === "ws-prod") { // NEW condition for GPU TODO
             string += "source /etc/profile.d/modules_cluster.sh\n";
             string += "source /etc/profile.d/modules.sh\n";
         }

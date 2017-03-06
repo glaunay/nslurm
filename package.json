@@ -1,6 +1,6 @@
 {
   "name": "nslurm",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "A library to communicate with a slurm scheduler/engine on HPC",
   "main": "index.js",
   "scripts": {

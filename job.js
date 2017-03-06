@@ -2,7 +2,6 @@ var events = require('events');
 var uuid = require('node-uuid');
 var fs = require('fs');
 var spawn = require('child_process').spawn;
-var chalk = require('chalk');
 
 
 

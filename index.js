@@ -140,8 +140,6 @@ module.exports = {
             'rootDir' : cacheDir,
             'adress' : TCPip, 'port' : TCPport,
             'ttl' : 50000,
-            'gid' : 'gid' in jobOpt ? jobOpt.gid : null,
-            'uid' : 'uid' in jobOpt ? jobOpt.uid : null,
             'partition' : 'partition' in jobOpt ? jobOpt.partition : null,
             'qos' : 'qos' in  jobOpt ? jobOpt.qos : null,
             'cmd' : 'cmd' in jobOpt ? jobOpt.cmd : null,
@@ -153,7 +151,10 @@ module.exports = {
             'modules' : 'modules' in jobOpt ? jobOpt.modules : null,
             'gres' : 'gres' in jobOpt ? jobOpt.gres : null
         });
-        jobsArray[newJob.id] = { 'obj' : newJob, 'status' : 'CREATED' };
+	if ('gid' in jobOpt) newJob['gid'] = jobOpt.gid;
+        if ('uid' in jobOpt) newJob['uid'] = jobOpt.uid;        
+
+	jobsArray[newJob.id] = { 'obj' : newJob, 'status' : 'CREATED' };
 
         self.jobsView();
 

@@ -15,6 +15,9 @@ var id = '00000'
 var core = null;
 
 var cacheDir = null;
+var probPreviousCacheDir = []; // list of the probable cacheDir used in previous nslurm instances
+
+var jobProfiles = {};
 
 var jobsArray = {};
 
@@ -92,6 +95,21 @@ module.exports = {
         eventEmitter.on(eventName, callback);
     },
     cacheDir : function() {return cacheDir;},
+    probPreviousCacheDir : function() {return probPreviousCacheDir;},
+
+
+    /*
+    * Select a job profile (depending on "partition", "qos", "gid", "uid", etc.)
+    */
+    selectJobProfile : function(key) {
+        if (! jobProfiles) console.log("WARNING : No jobProfiles detected !");
+        else {
+            if (jobProfiles.hasOwnProperty(key)) return jobProfiles[key];
+            else throw "ERROR : No " + key + " in jobProfiles !";
+        }
+    },
+
+
     /**
     * Display on console.log the current list of "pushed" jobs and their status
     *
@@ -186,7 +204,7 @@ module.exports = {
         cacheDir = opt.cacheDir + '/' + scheduler_id;
         TCPip = opt.tcp;
         TCPport = opt.port;
-
+        jobProfiles = opt.jobProfiles;
 
         if ('slurmBinaries' in opt) {
             sbatchPath = opt['slurmBinaries'] + '/sbatch';
@@ -195,6 +213,10 @@ module.exports = {
 
         if (opt.hasOwnProperty('forceCache')) {
             cacheDir = opt.forceCache;
+        }
+
+        if (opt.hasOwnProperty('probPreviousCacheDir')) {
+            probPreviousCacheDir = opt.probPreviousCacheDir;
         }
 
         console.log("Attempting to create cache for process at " + cacheDir);

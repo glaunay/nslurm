@@ -11,7 +11,7 @@ var TCPport = 2222;
 var TCPip = null;
 var scheduler_id = uuid.v4();
 var dataLength = 0;
-var id = '00000'
+var id = '00000';
 var core = null;
 
 var cacheDir = null;
@@ -30,6 +30,13 @@ var emulator = false; // Trying to keep api/events intact while running job as f
 var isStarted = false;
 
 
+/*
+    TCP address in use throws
+    https://www.npmjs.com/package/tcp-port-used
+    could be a way to check-safe port use
+    opening of port is async
+
+*/
 
 /**
 * List all the job ids of slurm that are both in this process and in the squeue command.
@@ -170,7 +177,7 @@ module.exports = {
             'gres' : 'gres' in jobOpt ? jobOpt.gres : null
         });
 	if ('gid' in jobOpt) newJob['gid'] = jobOpt.gid;
-        if ('uid' in jobOpt) newJob['uid'] = jobOpt.uid;        
+        if ('uid' in jobOpt) newJob['uid'] = jobOpt.uid;
 
 	jobsArray[newJob.id] = { 'obj' : newJob, 'status' : 'CREATED' };
 
@@ -228,7 +235,25 @@ module.exports = {
         }
 
         console.log('[' + TCPip + '] opening socket at port ' + TCPport);
+
+
+
+
         var s = _openSocket(TCPport);
+
+        /*var s = null;
+        var PORTS_POOL
+        try {
+            s = _openSocket(TCPport);
+        } catch(e) {
+            if ( e.code != 'EADDRINUSE' ) throw e;
+            console.log("Cache found already found at " + cacheDir);
+        }*/
+
+        /**/
+
+
+
         data = '';
         s.on('listening',function(socket){
             eventEmitter.emit("ready");

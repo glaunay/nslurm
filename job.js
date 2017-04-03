@@ -27,12 +27,11 @@ var _copyScript = function (job, fname, string, emitter) {
 }
 
 
-
 var sbatchDumper = function (job){
     var emitter = new events.EventEmitter();
     var string = "#!/bin/bash\n";
     var adress = job.emulated ? 'localhost' : job.adress;
-    var trailer = 'echo -n  "JOB_STATUS ' + job.id + ' FINISHED"  | nc -w 20 ' + adress + ' ' + job.port + " > /dev/null\n";
+    var trailer = 'echo -n  "JOB_STATUS ' + job.id + ' FINISHED"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n";
 
 // Sbatch content invariant
     if (!job.emulated) {
@@ -76,10 +75,10 @@ var sbatchDumper = function (job){
         });
 
 // Sbatch command content
-        string += 'echo -n  "JOB_STATUS ' + job.id + ' START"  | nc -w 20 ' + job.adress + ' ' + job.port + " > /dev/null\n"
+        string += 'echo -n  "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + job.adress + ' ' + job.port + " > /dev/null\n"
 
     } else { // wrapper sbatch script for local/fork usage
-        string += 'echo -n  "JOB_STATUS ' + job.id + ' START"  | nc -w 20 ' + adress + ' ' + job.port + " > /dev/null\n"
+        string += 'echo -n  "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n"
        // string += 'WORKDIR=' + job.cwd;
     }
     // DONT DO THAT

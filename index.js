@@ -3,6 +3,7 @@ var uuid = require('node-uuid');
 var events = require('events');
 var net = require('net');
 var jobLib = require('./job');
+var path = require('path');
 
 var sbatchPath = 'sbatch';
 var squeuePath = 'squeue';
@@ -11,7 +12,7 @@ var TCPport = 2222;
 var TCPip = null;
 var scheduler_id = uuid.v4();
 var dataLength = 0;
-var id = '00000';
+var id = '00000'
 var core = null;
 
 var cacheDir = null;
@@ -30,20 +31,13 @@ var emulator = false; // Trying to keep api/events intact while running job as f
 var isStarted = false;
 
 
-/*
-    TCP address in use throws
-    https://www.npmjs.com/package/tcp-port-used
-    could be a way to check-safe port use
-    opening of port is async
-
-*/
 
 /**
 * List all the job ids of slurm that are both in this process and in the squeue command.
 * Only used in the stop function.
-* Caution : the ids or not listed in order.
+* Warning : the ids or not listed in order.
 */
-var _listSlurmJobID = function() {
+var _listSlurmJobID = function(tagTask) {
     var emitter = new events.EventEmitter();
 
     // run squeue command
@@ -59,8 +53,9 @@ var _listSlurmJobID = function() {
         // squeue results
         var squeueIDs = ('' + stdout).replace(/\"/g, '');
         // regex
-        var reg_NslurmID = new RegExp ('^ardockTask_[a-z0-9-]+_hex_[0-9]{1,2}', 'i');
+        var reg_NslurmID = new RegExp ('^' + tagTask + 'Task_[\\S]{8}-[\\S]{4}-[\\S]{4}-[\\S]{4}-[\\S]{12}_{0,1}[\\S]*');
         var reg_slurmID = new RegExp ('[0-9]+$');
+        //console.log(squeueIDs);
 
         // for each job in the squeue
         squeueIDs.split('\n').forEach (function (line) {
@@ -102,7 +97,79 @@ module.exports = {
         eventEmitter.on(eventName, callback);
     },
     cacheDir : function() {return cacheDir;},
-    probPreviousCacheDir : function() {return probPreviousCacheDir;},
+    /*
+    * concatene two variables in json format
+    */
+    concatJson: function (json1, json2) {
+        var newJson = JSON.parse(JSON.stringify(json1));
+        for (var key in json2) {
+            if (json1.hasOwnProperty(key)) {
+                console.log(json1);
+                console.log(json2);
+                throw 'ERROR : same property in both JSON above : ' + key;
+            } else newJson[key] = json2[key];
+        }
+        return newJson;
+    },
+    
+    /*
+    * For a list of directories, find task directories and return them.
+    * TWO LEVELS OF RESEARCH :
+    * 1/ a directory in the list can be a task directory -> check the name of the directory
+    * 2/ or can contain task directories -> search inside the directory & check the sub-directory names
+    *
+    * TASK DIRECTORY CONVENTION :
+    * The name of a task directory is composed of the task tag (exemple : "naccess")
+    * with "Task_" and the unique id (uuid) and eventually a little string at the end (exemple : "_hex_25")
+    */
+
+    findTaskDir : function(tagTask) {
+        if (! tagTask) throw 'ERROR : no tag task specified !';
+        // convention of writing the task directory name
+        var re_taskDir = tagTask + 'Task_[\\S]{8}-[\\S]{4}-[\\S]{4}-[\\S]{4}-[\\S]{12}_{0,1}[\\S]*';
+        var re_inputDir = tagTask + 'Task_[\\S]{8}-[\\S]{4}-[\\S]{4}-[\\S]{4}-[\\S]{12}_inputs';
+        var taskDirs = [];
+
+        probPreviousCacheDir.map(function (dir) { // read the list of directories
+            try { var files = fs.readdirSync(dir); } // read content of the task directory (3)
+            catch (err) {
+                console.log(err);
+                return;
+            }
+            // LEVEL 1
+            files.filter(function (file) {
+                return file.match(re_taskDir); // check writing convention of the name
+            }).filter(function (file) {
+                return !file.match(re_inputDir); // not the input directories
+            }).map(function (file) {
+                return path.join(dir, file); // use full path
+            }).filter(function (file) {
+                return fs.statSync(file).isDirectory(); // only directories
+            }).map(function (file) {
+                return taskDirs.push(file);
+            });
+
+            files.map(function (file) {
+                return path.join(dir, file);
+            }).filter(function (file) {
+                return fs.statSync(file).isDirectory();
+            }).map(function (file) {
+                // LEVEL 2
+                return fs.readdirSync(file).filter(function (subFile) {
+                    return subFile.match(re_taskDir); // check writing convention of the name
+                }).filter(function (subFile) {
+                    return !subFile.match(re_inputDir); // not the input directories
+                }).map(function (subFile) {
+                    return path.join(file, subFile); // use full path
+                }).filter(function (subFile) {
+                    return fs.statSync(subFile).isDirectory(); // only directories
+                }).map(function (subFile) {
+                    return taskDirs.push(subFile);
+                });
+            });
+        });
+        return taskDirs;
+    },
 
 
     /*
@@ -155,6 +222,8 @@ module.exports = {
         //         qos = 'ws-dev';
         //     }
         // }
+            //
+        if (jobOpt.hasOwnProperty('generic') || jobOpt.hasOwnProperty('specific')) jobOpt = self.concatJson(jobOpt.generic,jobOpt.specific);
 
         var newJob = jobLib.createJob({
             'emulated' : emulator ? true : false,
@@ -177,7 +246,7 @@ module.exports = {
             'gres' : 'gres' in jobOpt ? jobOpt.gres : null
         });
 	if ('gid' in jobOpt) newJob['gid'] = jobOpt.gid;
-        if ('uid' in jobOpt) newJob['uid'] = jobOpt.uid;
+        if ('uid' in jobOpt) newJob['uid'] = jobOpt.uid;        
 
 	jobsArray[newJob.id] = { 'obj' : newJob, 'status' : 'CREATED' };
 
@@ -203,6 +272,7 @@ module.exports = {
     * @return {String}
     */
     start : function(opt) {
+        //console.log(opt)
         if (isStarted) return;
 
         if (!opt) {
@@ -235,25 +305,7 @@ module.exports = {
         }
 
         console.log('[' + TCPip + '] opening socket at port ' + TCPport);
-
-
-
-
         var s = _openSocket(TCPport);
-
-        /*var s = null;
-        var PORTS_POOL
-        try {
-            s = _openSocket(TCPport);
-        } catch(e) {
-            if ( e.code != 'EADDRINUSE' ) throw e;
-            console.log("Cache found already found at " + cacheDir);
-        }*/
-
-        /**/
-
-
-
         data = '';
         s.on('listening',function(socket){
             eventEmitter.emit("ready");
@@ -287,7 +339,7 @@ module.exports = {
     * and comparing them to the jobIds defined in slurm.
     * It needs to use the squeue and scancel commands.
     */
-    stop : function(bean) {
+    stop : function(bean, tagTask) {
         var self = this;
         var emitter = new events.EventEmitter();
 
@@ -298,7 +350,7 @@ module.exports = {
         }
         //console.log('Jobs of this process : ' + Object.keys(jobsArray));
 
-        _listSlurmJobID()
+        _listSlurmJobID(tagTask)
         .on('errSqueue', function (data) {
             console.log('Error for squeue command : ' + data);
             emitter.emit('errSqueue');

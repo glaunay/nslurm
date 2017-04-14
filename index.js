@@ -167,6 +167,10 @@ module.exports = {
                     return taskDirs.push(subFile);
                 });
             });
+            // next 3 lines for tests
+            console.log(taskDirs)
+            //taskDirs = ['/Users/mgarnier/Documents/Developpement/taskObjectTest/tmp/forceCache/simpleTask_1f3fe83c-71ba-4c90-beaa-4e2f6bad7028'];
+            console.log(taskDirs)
         });
         return taskDirs;
     },

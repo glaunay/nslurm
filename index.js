@@ -4,6 +4,7 @@ var events = require('events');
 var net = require('net');
 var jobLib = require('./job');
 var path = require('path');
+var clone = require('clone');
 
 var sbatchPath = 'sbatch';
 var squeuePath = 'squeue';
@@ -72,6 +73,53 @@ var _listSlurmJobID = function(tagTask) {
         });
         if (toKill.length === 0) emitter.emit('finished');
         else emitter.emit('jobLeft', toKill);
+    });
+    return emitter;
+}
+
+
+/*
+* Realize an asynchronous squeue command on slurm according a parameter (or not).
+* Results are then filtered to keep only jobs contained in our jobsArray{}.
+* Finally, datas are formated into a literal.
+* @paramSqueue {string} optional. For example : ' -o "%j %i" ' // not implemented yet
+*/
+var _squeue = function(paramSqueue) {
+    if (! paramSqueue) paramSqueue = '';
+    paramSqueue = ''; // to remove when it will be take into account in the implementation
+    var emitter = new events.EventEmitter();
+    var squeueRes_dict = {
+        'id' : [],
+        'partition' : [],
+        'nameUUID' : [],
+        'status' : []
+    }
+
+    // squeue command
+    var exec_cmd = require('child_process').exec;
+    exec_cmd(squeuePath + '  -o \"\%i \%P \%j \%t\" ' + paramSqueue, function (err, stdout, stderr) {
+        if (err){
+            emitter.emit('errSqueue', err);
+            return;
+        }
+
+        var squeueRes_str = ('' + stdout).replace(/\"/g, ''); // squeue results
+        squeueRes_str.split('\n')
+        .map(function (jobLine, i) { // for each job
+            return test = jobLine.split(' ').filter(function (val) {
+                return val != ''; // keep values that are not empty
+            });
+        })
+        .filter(function (jobArray) {
+            return jobsArray.hasOwnProperty(jobArray[2]); // keep jobs of our jobsArray
+        })
+        .map(function (jobArray, i) { // save each field in the corresponding array of dict
+            squeueRes_dict.id.push(jobArray[0]); // job ID gived by slurm
+            squeueRes_dict.partition.push(jobArray[1]); // gpu, cpu, etc.
+            squeueRes_dict.nameUUID.push(jobArray[2]); // unique job ID gived by Nslurm (uuid)
+            squeueRes_dict.status.push(jobArray[3]); // P, R, CF, CG, etc.
+        });
+        emitter.emit('data', squeueRes_dict);
     });
     return emitter;
 }
@@ -209,6 +257,91 @@ module.exports = {
         return null;
 
     },
+
+    /*
+    * This method manipulate the object gived by _squeue()
+    */
+    squeueReport : function () {
+        var emitter = new events.EventEmitter();
+        var squeueRes;
+        _squeue().on('data', function (d) {
+            // to return with the event 'end' :
+            var interface = {
+                data : d,
+
+                /*
+                * Search for all jobs running on a given @partition
+                * @partition must be the name of a partition or a part of the name
+                * (match method is used instead of ===)
+                */
+                matchPartition : function (partition) {
+                    var self = this;
+                    var results = {
+                        'id' : [],
+                        'partition' : [],
+                        'nameUUID' : [],
+                        'status' : []
+                    };
+                    self.data.partition.map(function (val, i) { // for each partition
+                        if (val.match(partition)) { // if the job is on @partition
+                            for (var key in self.data) { // keep all the {'key':'value'} corresponding
+                                results[key].push(self.data[key][i]);
+                            }
+                        }
+                    });
+                    return results;
+                }
+            };
+            emitter.emit('end', interface);
+        }).on('errSqueue', function (err) {
+            console.log('ERROR with _squeue() method in nslurm : ');
+            console.log(err);
+            emitter.emit('errSqueue');
+        });
+        return emitter;
+    },
+
+
+    /*
+    * Check the existence of our jobs (present in jobsArray) in the squeue.
+    */
+    jobWarden : function () {
+        var emitter = new events.EventEmitter();
+        _squeue().on('data', function (d) {
+            for (var key in jobsArray) {
+                var curr_job =jobsArray[key];
+                if(curr_job.status === "CREATED"){
+                    continue;
+                }
+
+                if (d.nameUUID.indexOf(key) === -1) { // if key is not found in squeue
+                    curr_job.obj.MIA_jokers -= 1;
+                    console.log('The job "' + key + '" missing from queue! Jokers left is ' +  curr_job.obj.MIA_jokers);
+                    if (curr_job.obj.MIA_jokers === 0) {
+                        var jobTmp = clone(curr_job); // deepcopy of the disappeared job
+                        jobTmp.obj.emitter = curr_job.obj.emitter; // keep same emitter reference
+                        delete jobsArray[key];
+                    // console.log("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+                    // console.log(jobTmp);
+                        jobTmp.obj.emitter.emit('lostJob', 'The job "' + key + '" is not in the queue !', jobTmp.obj);
+                    }
+                } else{
+                    if (curr_job.obj.MIA_jokers < 3)
+                        console.log('Job "' + key + '" found BACK ! Jokers count restored');
+
+                    curr_job.obj.MIA_jokers = 3;
+                }
+            }
+            //emitter.emit('');
+        }).on('errSqueue', function (err) {
+            console.log('ERROR with _squeue() method in nslurm : ');
+            console.log(err);
+            emitter.emit('errSqueue');
+        });
+        return emitter;
+    },
+
+
     /**
     * Submit a job to manager,
     *
@@ -257,11 +390,18 @@ module.exports = {
         self.jobsView();
 
         newJob.emitter.on('submitted', function(j){
+            //console.log(j);
             jobsArray[j.id].status = 'SUBMITTED';
             self.jobsView();
+        }).on('jobStart', function (job) {
+            // next lines for tests on squeueReport() :
+            // self.squeueReport().on('end', function (interface) {
+            //     console.log(interface.matchPartition('ws-'));
+            // });
         })
 
         exhaustBool = true;
+        //console.log(jobsArray);
 
         return newJob.emitter;
     },
@@ -278,6 +418,7 @@ module.exports = {
     start : function(opt) {
         //console.log(opt)
         if (isStarted) return;
+        var self = this;
 
         if (!opt) {
             throw "Options required to start manager : \"cacheDir\", \"tcp\", \"port\"";
@@ -317,6 +458,7 @@ module.exports = {
             console.log("Starting pulse monitoring");
             console.log("cache Directory is " + cacheDir);
             core = setInterval(function(){_pulse()},500);
+            warden = setInterval(function() {self.jobWarden()}, 5000);
 
             /*socket.on('data', function (chunk) {
                 data += chunk.toString();
@@ -457,6 +599,10 @@ function _parseMessage(string) {
     console.log('Status Updating [job ' + jid + ' ] : from \'' +
                 jobsArray[jid].status  + '\' to \'' + uStatus + '\'');
     jobsArray[jid].status = uStatus;
+    if (uStatus === 'START') {
+        // console.log(jobsArray[jid]);
+        jobsArray[jid].obj.emitter.emit('jobStart', jobsArray[jid].obj);
+    }
     if (uStatus === "FINISHED")
         _pull(jid);
 };

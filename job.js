@@ -182,6 +182,7 @@ var Job = function (opt) {
     this.cwd = 'cwd' in opt ? opt.cwd : null;
     this.cwdClone = 'cwdClone' in opt ? opt.cwdClone : false;
 
+    this.MIA_jokers = 3; //  Number of time a job is allowed to not be found in the squeue
 
     //console.dir(opt);
     this.sbatch = 'sbatch' in opt ? opt.sbatch : 'sbatch';
@@ -274,9 +275,13 @@ Job.prototype.submit = function(fname) {
     //}
 
     console.log('sbatch w/, ' + this.sbatch + sbatchArgArray);
+    console.log('this.sbatch : >' + this.sbatch + '<');
+    console.log('sbatchArgArray : >' + sbatchArgArray + '<');
+    console.log('this.workdir : >' + this.workDir + '<');
     var process = spawn(this.sbatch, sbatchArgArray, { 'cwd' : this.workDir });
-
-    this.emitter.emit('submitted', this);
+    process.on('exit', function () {
+        self.emitter.emit('submitted', self);
+    });
 }
 
 Job.prototype.fork = function(fname) {

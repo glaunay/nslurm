@@ -33,47 +33,8 @@ var sbatchDumper = function (job){
     var adress = job.emulated ? 'localhost' : job.adress;
     var trailer = 'echo -n  "JOB_STATUS ' + job.id + ' FINISHED"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n";
 
-// Sbatch content invariant
     if (!job.emulated) {
-        string += "#SBATCH -J " + job.id + "\n";
-// User' specific sbatch parameters, TO BE COMPLETED
-        var nNodes = job.hasOwnProperty('nNodes') ? job.nNodes ? job.nNodes : 1 : 1;
-        string += "#SBATCH -N " + nNodes + " # Number of nodes, aka number of worker \n"
-        var nCores = job.hasOwnProperty('nCores') ? job.nCores ? job.nCores : 1 : 1;
-        string += "#SBATCH -n " + nCores + " # number of task, ie core\n"
-
-        var tWall = job.hasOwnProperty('tWall') ? job.tWall  ? job.tWall : '0-00:05' : '0-00:05';
-        string += "#SBATCH -t " + tWall + " # Runtime in D-HH:MM\n";
-        var qos = job.hasOwnProperty('qos') ? job.qos : 'mobi-express';
-        var partition = job.hasOwnProperty('partition') ? job.partition : 'mobi-express';
-        string += "#SBATCH -p " + partition + " # Partition to submit to\n"
-                + "#SBATCH --qos " + qos + " # Partition to submit to\n";
-
-        var stdout = job.hasOwnProperty('out') ? job.out : job.id + ".out";
-        string += "#SBATCH -o " + stdout + "\n";
-        var stderr = job.hasOwnProperty('err') ? job.err : job.id + ".err";
-        string += "#SBATCH -e " + stderr + "\n";
-
-        if (job.hasOwnProperty('gid')) {
-            string += "#SBATCH --gid " + job.gid + "\n";
-        }
-        if (job.hasOwnProperty('uid')) {
-            string += "#SBATCH --uid " + job.uid + "\n";
-        }
-        if (job.gres != null) {
-            string += "#SBATCH --gres=" + job.gres + "\n";
-        }
-
-        if (qos === "ws-dev" || qos === "gpu" || qos === "ws-prod") { // NEW condition for GPU TODO
-            string += "source /etc/profile.d/modules_cluster.sh\n";
-            string += "source /etc/profile.d/modules.sh\n";
-        }
-
-        // NEW to load the modules
-        job.modules.forEach(function(e){
-            string += "module load " + e + '\n';
-        });
-
+        string += engineDumper /// HERE
 // Sbatch command content
         string += 'echo -n  "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + job.adress + ' ' + job.port + " > /dev/null\n"
 

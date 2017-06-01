@@ -6,6 +6,10 @@ var jobLib = require('./job');
 var path = require('path');
 var clone = require('clone');
 
+var sgeLib = require('./lib/sge');
+var slurmLib = require('./lib/slurm');
+var engine = null;
+
 var sbatchPath = 'sbatch';
 var squeuePath = 'squeue';
 
@@ -31,101 +35,30 @@ var emulator = false; // Trying to keep api/events intact while running job as f
 
 var isStarted = false;
 
+// Set scheduler engine and emulation state
+var configure = function (opt) {
+    if(!opt.hasOwnProperty('engine')) throw "Please specify a scheduler engine";
+    if(opt.engine === "sge")
+        engine = sgeLib;
+    else if(opt.engine === "slurm")
+        engine = null;
+    else if (opt.engine === "emulator")
 
-
-/**
-* List all the job ids of slurm that are both in this process and in the squeue command.
-* Only used in the stop function.
-* Warning : the ids or not listed in order.
-*/
-var _listSlurmJobID = function(tagTask) {
-    var emitter = new events.EventEmitter();
-
-    // run squeue command
-    var exec_cmd = require('child_process').exec;
-    exec_cmd(squeuePath + ' -o \"\%j \%i\"', function (err, stdout, stderr) {
-        if (err) {
-            emitter.emit('errSqueue', err);
-            return;
-        }
-        // list of slurmIDs of the jobs to kill
-        var toKill = new Array();
-
-        // squeue results
-        var squeueIDs = ('' + stdout).replace(/\"/g, '');
-        // regex
-        var reg_NslurmID = new RegExp ('^' + tagTask + 'Task_[\\S]{8}-[\\S]{4}-[\\S]{4}-[\\S]{4}-[\\S]{12}_{0,1}[\\S]*');
-        var reg_slurmID = new RegExp ('[0-9]+$');
-        //console.log(squeueIDs);
-
-        // for each job in the squeue
-        squeueIDs.split('\n').forEach (function (line) {
-            // use the regex
-            if (reg_NslurmID.test(line) && reg_slurmID.test(line)) {
-                var NslurmID = reg_NslurmID.exec(line);
-                var slurmID = reg_slurmID.exec(line);
-                // in case we found NslurmID in the jobs of our process
-                if (jobsArray.hasOwnProperty(NslurmID)) {
-                    console.log('Job ' + slurmID + ' must be killed');
-                    toKill.push(slurmID[0]);
-                }
-            }
-        });
-        if (toKill.length === 0) emitter.emit('finished');
-        else emitter.emit('jobLeft', toKill);
-    });
-    return emitter;
-}
-
-
-/*
-* Realize an asynchronous squeue command on slurm according a parameter (or not).
-* Results are then filtered to keep only jobs contained in our jobsArray{}.
-* Finally, datas are formated into a literal.
-* @paramSqueue {string} optional. For example : ' -o "%j %i" ' // not implemented yet
-*/
-var _squeue = function(paramSqueue) {
-    if (! paramSqueue) paramSqueue = '';
-    paramSqueue = ''; // to remove when it will be take into account in the implementation
-    var emitter = new events.EventEmitter();
-    var squeueRes_dict = {
-        'id' : [],
-        'partition' : [],
-        'nameUUID' : [],
-        'status' : []
+    if (opt.engine != "emulator") {
+        if(!opt.hasOwnProperty('binaries')) throw "You must specify scheduler engine binaries";
+        _setBinariesSpecs(opt.binaries);
     }
 
-    // squeue command
-    var exec_cmd = require('child_process').exec;
-    exec_cmd(squeuePath + '  -o \"\%i \%P \%j \%t\" ' + paramSqueue, function (err, stdout, stderr) {
-        if (err){
-            emitter.emit('errSqueue', err);
-            return;
-        }
-
-        var squeueRes_str = ('' + stdout).replace(/\"/g, ''); // squeue results
-        squeueRes_str.split('\n')
-        .map(function (jobLine, i) { // for each job
-            return test = jobLine.split(' ').filter(function (val) {
-                return val != ''; // keep values that are not empty
-            });
-        })
-        .filter(function (jobArray) {
-            return jobsArray.hasOwnProperty(jobArray[2]); // keep jobs of our jobsArray
-        })
-        .map(function (jobArray, i) { // save each field in the corresponding array of dict
-            squeueRes_dict.id.push(jobArray[0]); // job ID gived by slurm
-            squeueRes_dict.partition.push(jobArray[1]); // gpu, cpu, etc.
-            squeueRes_dict.nameUUID.push(jobArray[2]); // unique job ID gived by Nslurm (uuid)
-            squeueRes_dict.status.push(jobArray[3]); // P, R, CF, CG, etc.
-        });
-        emitter.emit('data', squeueRes_dict);
-    });
-    return emitter;
 }
 
-
-
+var _checkBinariesSpecs(opt) {
+    var vKeys = ["cancelBin", "queueBin", "submitBin"];
+    var msg = "Missing engine binaries parameters keys \"cancelBin\", \"queueBin\", \"submitBin\"";
+    for (var k in vKeys)
+        if (!opt.hasOwnProperty(k)
+            throw msg;
+    engine.configure(opt);
+}
 /**
  * perform a squeue action
  *
@@ -141,6 +74,8 @@ module.exports = {
     */
     emulate : function(){ emulator = true; },
     isEmulated : function(){ return emulator; },
+    configure : configure,
+
     on : function(eventName, callback) { //
         eventEmitter.on(eventName, callback);
     },
@@ -159,7 +94,7 @@ module.exports = {
         }
         return newJson;
     },
-    
+
     /*
     * For a list of directories, find task directories and return them.
     * TWO LEVELS OF RESEARCH :
@@ -261,45 +196,10 @@ module.exports = {
     /*
     * This method manipulate the object gived by _squeue()
     */
-    squeueReport : function () {
-        var emitter = new events.EventEmitter();
-        var squeueRes;
-        _squeue().on('data', function (d) {
-            // to return with the event 'end' :
-            var interface = {
-                data : d,
-
-                /*
-                * Search for all jobs running on a given @partition
-                * @partition must be the name of a partition or a part of the name
-                * (match method is used instead of ===)
-                */
-                matchPartition : function (partition) {
-                    var self = this;
-                    var results = {
-                        'id' : [],
-                        'partition' : [],
-                        'nameUUID' : [],
-                        'status' : []
-                    };
-                    self.data.partition.map(function (val, i) { // for each partition
-                        if (val.match(partition)) { // if the job is on @partition
-                            for (var key in self.data) { // keep all the {'key':'value'} corresponding
-                                results[key].push(self.data[key][i]);
-                            }
-                        }
-                    });
-                    return results;
-                }
-            };
-            emitter.emit('end', interface);
-        }).on('errSqueue', function (err) {
-            console.log('ERROR with _squeue() method in nslurm : ');
-            console.log(err);
-            emitter.emit('errSqueue');
-        });
-        return emitter;
-    },
+    queueReport : function() {
+        return engine.queueReport;
+    }
+   ,
 
 
     /*
@@ -307,7 +207,7 @@ module.exports = {
     */
     jobWarden : function () {
         var emitter = new events.EventEmitter();
-        _squeue().on('data', function (d) {
+        engine.list().on('data', function (d) {
             for (var key in jobsArray) {
                 var curr_job =jobsArray[key];
                 if(curr_job.status === "CREATED"){
@@ -333,10 +233,10 @@ module.exports = {
                 }
             }
             //emitter.emit('');
-        }).on('errSqueue', function (err) {
-            console.log('ERROR with _squeue() method in nslurm : ');
+        }).on('listError', function (err) {
+            console.log('ERROR with engine list method :');
             console.log(err);
-            emitter.emit('errSqueue');
+            emitter.emit('listError');
         });
         return emitter;
     },
@@ -383,7 +283,7 @@ module.exports = {
             'gres' : 'gres' in jobOpt ? jobOpt.gres : null
         });
 	if ('gid' in jobOpt) newJob['gid'] = jobOpt.gid;
-        if ('uid' in jobOpt) newJob['uid'] = jobOpt.uid;        
+        if ('uid' in jobOpt) newJob['uid'] = jobOpt.uid;
 
 	jobsArray[newJob.id] = { 'obj' : newJob, 'status' : 'CREATED' };
 
@@ -495,9 +395,7 @@ module.exports = {
             scancelPath = bean.managerSettings['slurmBinaries'] + '/scancel';
         }
         //console.log('Jobs of this process : ' + Object.keys(jobsArray));
-
-        _listSlurmJobID(tagTask)
-        .on('errSqueue', function (data) {
+        engine.listJobID.on('listError', function (data) {
             console.log('Error for squeue command : ' + data);
             emitter.emit('errSqueue');
         })
@@ -506,10 +404,11 @@ module.exports = {
             emitter.emit('cleanExit');
         })
         .on('jobLeft', function (toKill) {
+
             // run scancel command
             console.log('Try to cancel the job ' + toKill);
             var exec_cmd = require('child_process').exec;
-            exec_cmd(scancelPath + ' ' + toKill.join(' '), function (err, stdout, stderr) {
+            exec_cmd(engine.cancelBin() + ' ' + toKill.join(' '), function (err, stdout, stderr) {
                 if (err) {
                     console.log('Error for scancel command : ' + err);
                     emitter.emit('errScancel');
@@ -521,7 +420,6 @@ module.exports = {
         });
         return emitter;
     },
-
 
     set_id : function (val){
         id = val
@@ -582,7 +480,7 @@ module.exports = {
 // Private Module functions
 
 function _parseMessage(string) {
-    //console.log("trying to parse " + string);
+    console.log("trying to parse " + string);
     var re = /^JOB_STATUS[\s]+([\S]+)[\s]+([\S]+)$/
     var matches = string.match(re);
     if (! matches) return;

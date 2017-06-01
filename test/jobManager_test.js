@@ -6,10 +6,19 @@
     */
 /* qbatch;nc->sbatch->nc */
 
-s = require('../index.js');
+var jobManager = require('../index.js');
+
+var parseConfig = function (fileName){
+    var obj = jsonfile.readFileSync(fileName);
+    return obj;
+};
 
 
-var cacheDir, port, tcp;
+
+
+var cacheDir, port, tcp, engineType;
+var bean = {};
+
 process.argv.forEach(function (val, index, array){
     /*if (val === '--local') bLocal = true;
     if (val === '--gpu') ardockFunc = PDB_Lib.arDock_gpu;
@@ -23,7 +32,7 @@ process.argv.forEach(function (val, index, array){
         if (! array[index + 1])
             throw("usage : ");
         cacheDir = array[index + 1];
-         console.log("cacheDir is  ==> " + cacheDir);
+        console.log("cacheDir is  ==> " + cacheDir);
     }
     if (val === '-a'){
         if (! array[index + 1])
@@ -31,12 +40,26 @@ process.argv.forEach(function (val, index, array){
         tcp = array[index + 1];
         console.log("ip adress is  ==> " + tcp);
     }
+    if (val === '-e'){
+        if (! array[index + 1])
+            throw("usage : ");
+        engineType = array[index + 1];
+        console.log("Scheduler engine type is ==> " + engineType);
+    }
+    if (val === '-f'){
+        if (! array[index + 1])
+            throw("usage : ");
+        bean = parseConfig(array[index + 1]);
+    }
+
+
 });
 
-s.start({ 'cacheDir' : cacheDir,
+jobManager.configure({"engine" : engineType, "binaries" : bean.binaries });
+jobManager.start({ 'cacheDir' : cacheDir,
           'tcp' : tcp,
           'port' : port
       });
-s.on('exhausted', function(){
+jobManager.on('exhausted', function(){
         console.log("All jobs processed");
     });

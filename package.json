@@ -20,6 +20,8 @@
     "url": "https://github.com/glaunay/nSlurm/issues"
   },
   "dependencies": {
-    "node-uuid": "^1.4.7"
+    "clone": "^2.1.1",
+    "node-uuid": "^1.4.7",
+    "path": "^0.12.7"
   }
 }

@@ -51,8 +51,6 @@ process.argv.forEach(function (val, index, array){
             throw("usage : ");
         bean = parseConfig(array[index + 1]);
     }
-
-
 });
 
 jobManager.configure({"engine" : engineType, "binaries" : bean.binaries });

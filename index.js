@@ -328,11 +328,12 @@ module.exports = {
         TCPport = opt.port;
         jobProfiles = opt.jobProfiles;
 
+/*      THIS SHOULD BE MOVED/DELETED
         if ('slurmBinaries' in opt) {
             sbatchPath = opt['slurmBinaries'] + '/sbatch';
             squeuePath = opt['slurmBinaries'] + '/squeue';
         }
-
+*/
         if (opt.hasOwnProperty('forceCache')) {
             cacheDir = opt.forceCache;
         }
@@ -390,10 +391,12 @@ module.exports = {
         var emitter = new events.EventEmitter();
 
         // define squeue and scancel pathways
+        /* THIS SHOULD BE MOVED / ERASED
         if ('slurmBinaries' in bean.managerSettings) {
             squeuePath = bean.managerSettings['slurmBinaries'] + '/squeue';
             scancelPath = bean.managerSettings['slurmBinaries'] + '/scancel';
         }
+        */
         //console.log('Jobs of this process : ' + Object.keys(jobsArray));
         engine.listJobID.on('listError', function (data) {
             console.log('Error for squeue command : ' + data);

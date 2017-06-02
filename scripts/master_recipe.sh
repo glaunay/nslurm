@@ -22,6 +22,8 @@ CACHE_DIR=$HOME_DIR/cacheDir
 sudo chmod a+w $CACHE_DIR
 
 PRIVATE_IP=`awk '$2 == "master" {print $1;exit}' /etc/hosts`
+mkdir $CACHE_DIR
+
 
 cat << EOF > $HOME_DIR/configuration.json
 {
@@ -41,5 +43,26 @@ cat << EOF > $HOME_DIR/configuration.json
 }
 EOF
 
-mkdir $CACHE_DIR
+cat << EOF > $HOME_DIR/dummy.sh
+ls
+pwd -P
+sleep 35
+echo "Something"
+EOF
 
+cat << EOF > $HOME_DIR/dummy.qsub
+#!/bin/bash
+#
+# LOG ERROR SCHEDULER located in
+# /opt/sge/default/spool/
+#$ -u ifbuser
+#$ -wd /home/ifbuser/cacheDir
+#$ -N dummy_name_long
+#$ -o dummy.out
+#$ -e dummy.err
+
+ls
+pwd -P
+EOF
+
+sleep 300

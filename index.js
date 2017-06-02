@@ -37,26 +37,29 @@ var isStarted = false;
 
 // Set scheduler engine and emulation state
 var configure = function (opt) {
-    if(!opt.hasOwnProperty('engine')) throw "Please specify a scheduler engine";
+    console.log("############CONF###\n");
+    console.dir(opt);
+    if(!opt.hasOwnProperty('engine')) throw("Please specify a scheduler engine");
     if(opt.engine === "sge")
         engine = sgeLib;
     else if(opt.engine === "slurm")
-        engine = null;
+        engine = slurmLib;
     else if (opt.engine === "emulator")
 
     if (opt.engine != "emulator") {
         if(!opt.hasOwnProperty('binaries')) throw "You must specify scheduler engine binaries";
-        _setBinariesSpecs(opt.binaries);
+        //_setBinariesSpecs(opt.binaries);
     }
-
+    engine.configure(opt.binaries, jobsArray);
+    console.log("Engine configured is " + engine.type());
 }
 
-var _checkBinariesSpecs(opt) {
+var _checkBinariesSpecs = function(opt) {
     var vKeys = ["cancelBin", "queueBin", "submitBin"];
     var msg = "Missing engine binaries parameters keys \"cancelBin\", \"queueBin\", \"submitBin\"";
     for (var k in vKeys)
-        if (!opt.hasOwnProperty(k)
-            throw msg;
+        if (!opt.hasOwnProperty(k))
+            throw(msg);
     engine.configure(opt);
 }
 /**
@@ -72,6 +75,7 @@ module.exports = {
     * @param  {String}eventName, {Function}callback
     * @return N/A
     */
+    engine : function(){ return engine;},
     emulate : function(){ emulator = true; },
     isEmulated : function(){ return emulator; },
     configure : configure,

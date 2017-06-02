@@ -21,7 +21,13 @@
   },
   "dependencies": {
     "clone": "^2.1.1",
+    "jsonfile": "^3.0.0",
     "node-uuid": "^1.4.7",
-    "path": "^0.12.7"
+    "path": "^0.12.7",
+    "xml-parser": "^1.2.1",
+    "xml2js": "^0.4.17"
+  },
+  "devDependencies": {
+    "util": "^0.10.3"
   }
 }

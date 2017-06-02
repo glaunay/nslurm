@@ -5,6 +5,8 @@
 
     */
 /* qbatch;nc->sbatch->nc */
+var jsonfile = require('jsonfile');
+var events = require('events');
 
 var jobManager = require('../index.js');
 
@@ -53,8 +55,17 @@ process.argv.forEach(function (val, index, array){
     }
 });
 
+
+port = port ? port : bean.port;
+tcp = tcp ? tcp : bean.tcp;
+engineType = engineType ? engineType : bean.engineType;
+
 jobManager.configure({"engine" : engineType, "binaries" : bean.binaries });
-jobManager.start({ 'cacheDir' : cacheDir,
+
+jobManager.engine().list()
+    .on('data', function() {process.exit();});
+
+jobManager.start({ 'cacheDir' : bean.cacheDir,
           'tcp' : tcp,
           'port' : port
       });

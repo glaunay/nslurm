@@ -27,14 +27,14 @@ var _copyScript = function (job, fname, string, emitter) {
 }
 
 
-var sbatchDumper = function (job){
+var batchDumper = function (job){
     var emitter = new events.EventEmitter();
     var string = "#!/bin/bash\n";
     var adress = job.emulated ? 'localhost' : job.adress;
     var trailer = 'echo -n  "JOB_STATUS ' + job.id + ' FINISHED"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n";
 
     if (!job.emulated) {
-        string += engineDumper /// HERE
+        string += this.engineHeader; /// HERE
 // Sbatch command content
         string += 'echo -n  "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + job.adress + ' ' + job.port + " > /dev/null\n"
 
@@ -51,8 +51,6 @@ var sbatchDumper = function (job){
         }
     }
 
-    if (job.cwd && job.cloneCwd)
-        string += "cp -rf " + job.cwd + ' $WORKDIR';
 
 // if script file provided, check/cp and call it
     if (job.script) {
@@ -128,7 +126,8 @@ TODO
 /* Job constructor */
 var Job = function (opt) {
     Core.call(this, opt);
-
+    this.batch = opt.batch;
+    this.engineHeader = opt.engineHeader;
     this.ttl = opt.ttl; //default ttl is 5000ms
     this.modules = opt.modules; // module load ...
     this.gres = opt.gres; // gres sbatch option for GPU
@@ -146,7 +145,6 @@ var Job = function (opt) {
     this.MIA_jokers = 3; //  Number of time a job is allowed to not be found in the squeue
 
     //console.dir(opt);
-    this.sbatch = 'sbatch' in opt ? opt.sbatch : 'sbatch';
     //console.log(">>>>>> " + this.sbatch);
     var self = this;
     fs.mkdir(this.workDir, function (err) {
@@ -203,7 +201,7 @@ Job.prototype.setUp = function(data) {
         this.gres = data.gres;
     }
 
-    sbatchDumper(this).on('ready', function (string){
+    batchDumper(this).on('ready', function (string){
         var fname = self.workDir + '/' + self.id + '.sbatch';
         if (self.emulated) fname = self.workDir + '/' + self.id + '.sh';
         fs.writeFile(fname, string, function(err) {
@@ -236,10 +234,10 @@ Job.prototype.submit = function(fname) {
     //}
 
     console.log('sbatch w/, ' + this.sbatch + sbatchArgArray);
-    console.log('this.sbatch : >' + this.sbatch + '<');
+    console.log('this.sbatch : >' + this.batch + '<');
     console.log('sbatchArgArray : >' + sbatchArgArray + '<');
     console.log('this.workdir : >' + this.workDir + '<');
-    var process = spawn(this.sbatch, sbatchArgArray, { 'cwd' : this.workDir });
+    var process = spawn(this.batch, sbatchArgArray, { 'cwd' : this.workDir });
     process.on('exit', function () {
         self.emitter.emit('submitted', self);
     });

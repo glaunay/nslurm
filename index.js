@@ -253,44 +253,23 @@ module.exports = {
     * @return {EventEmitter} jobEmitter
     */
     push : function(jobOpt) {
-        //console.log("jobOpt");
-        //console.log(jobOpt);
+        console.log("jobOpt");
+        console.log(jobOpt);
         var self = this;
-        // var partition, qos = null;
-        // if (jobOpt.gid) {
-        //     if (jobOpt.gid === "ws_users") {
-        //         partition = 'ws-dev';
-        //         qos = 'ws-dev';
-        //     }
-        // }
-            //
         if (jobOpt.hasOwnProperty('generic') || jobOpt.hasOwnProperty('specific')) jobOpt = self.concatJson(jobOpt.generic,jobOpt.specific);
 
-        var newJob = jobLib.createJob({
-            'emulated' : emulator ? true : false,
-            'id' : 'id' in jobOpt ? jobOpt.id : null,
-            'cwd' : 'cwd' in jobOpt ? jobOpt.cwd : null,
-            'cwdClone' : 'cwdClone' in jobOpt ? jobOpt.cwdClone : false,
-            'sbatch' : sbatchPath,
-            'rootDir' : cacheDir,
-            'adress' : TCPip, 'port' : TCPport,
-            'ttl' : 50000,
-            'partition' : 'partition' in jobOpt ? jobOpt.partition : null,
-            'qos' : 'qos' in  jobOpt ? jobOpt.qos : null,
-            'cmd' : 'cmd' in jobOpt ? jobOpt.cmd : null,
-            'script' : 'script' in jobOpt ? jobOpt.script : null,
-            'exportVar' : 'exportVar' in jobOpt ? jobOpt.exportVar : null,
-            'tWall' : 'tWall' in jobOpt ? jobOpt.tWall : null,
-            'nNodes' : 'nNodes' in jobOpt ? jobOpt.nNodes : null,
-            'nCores' : 'nCores' in jobOpt ? jobOpt.nCores : null,
-            'modules' : 'modules' in jobOpt ? jobOpt.modules : null,
-            'gres' : 'gres' in jobOpt ? jobOpt.gres : null
-        });
-	if ('gid' in jobOpt) newJob['gid'] = jobOpt.gid;
+        var jobTemplate = engine.createJobTemplate(jobOpt);
+        jobTemplate.rootDir = cacheDir
+        jobTemplate.emulated = emulator ? true : false,
+        jobTemplate.adress = TCPip;
+        jobTemplate.port = TCPport;
+        jobTemplate.engineHeader;
+        jobTemplate.script = 'script' in jobOpt ? jobOpt.script : null;
+        var newJob = jobLib.createJob(jobTemplate);
+/*	if ('gid' in jobOpt) newJob['gid'] = jobOpt.gid;
         if ('uid' in jobOpt) newJob['uid'] = jobOpt.uid;
-
-	jobsArray[newJob.id] = { 'obj' : newJob, 'status' : 'CREATED' };
-
+*/
+	    jobsArray[newJob.id] = { 'obj' : newJob, 'status' : 'CREATED' };
         self.jobsView();
 
         newJob.emitter.on('submitted', function(j){

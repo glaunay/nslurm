@@ -1,0 +1,15 @@
+{
+    "binaries" : {
+        "cancelBin" : "/opt/sge/bin/lx-amd64/qdel",
+        "queueBin"  : "/opt/sge/bin/lx-amd64/qstat",
+        "submitBin" : "/opt/sge/bin/lx-amd64/qsub"
+  },
+  "cacheDir" : "/home/ifbuser/cacheDir",
+  "port" : "5000",
+  "tcp" : "10.10.1.15",
+  "engineType" : "sge",
+  "jobSettings" : {
+  	"user" : "ifbuser",
+	"script" : "/home/ifbuser/dummyTask.sh"
+  }
+}

@@ -1,0 +1,25 @@
+{
+    "comments": "Definition of slurms set of preprocessors options values",
+    "definitions": {
+        "arwen_gpu": {
+            "partition": "gpu_dp",
+            "qos": "gpu"
+        },
+        "arwen_cpu": {
+            "partition": "mpi-mobi",
+            "qos": "mpi-mobi"
+        },
+        "arwen-dev_gpu": {
+            "partition": "gpu",
+            "qos": "gpu",
+            "gid": "ws_users",
+            "uid": "ws_ardock"
+        },
+        "arwen-dev_cpu": {
+            "partition": "ws_dev",
+            "qos": "ws_dev",
+            "gid": "ws_users",
+            "uid": "ws_ardock"
+        }
+    }
+}

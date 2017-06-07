@@ -2,8 +2,9 @@ var events = require('events');
 var uuid = require('node-uuid');
 var fs = require('fs');
 var spawn = require('child_process').spawn;
-
-
+var mkdirp = require('mkdirp');
+const util = require('util');
+const isStream = require('is-stream');
 
 var _copyScript = function (job, fname, string, emitter) {
 
@@ -50,19 +51,20 @@ var batchDumper = function (job){
             string += key + '=' + job.exportVar[key] + '\n';
         }
     }
-
+    job.modules.forEach(function(e){
+        string += "module load " + e;
+    });
 
 // if script file provided, check/cp and call it
     if (job.script) {
         var fname = job.workDir + '/' + job.id + '_coreScript.sh';
         string += '. ' + fname + '\n' + trailer;
         _copyScript(job, fname, string, emitter);
-
+        setTimeout(function(){
+            emitter.emit('ready', string);
+        }, 5);
     // just for tests
     } else {
-        job.modules.forEach(function(e){
-            string += "module load " + e;
-        });
         string += job.cmd ? job.cmd : defaultCommand;
         string += trailer;
         setTimeout(function(){
@@ -125,15 +127,18 @@ TODO
 
 /* Job constructor */
 var Job = function (opt) {
+    if (!opt.hasOwnProperty(id)) {
+        throw ("Job constructor must be provided an uuid");
+    }
     Core.call(this, opt);
     this.batch = opt.batch;
     this.engineHeader = opt.engineHeader;
-    this.ttl = opt.ttl; //default ttl is 5000ms
-    this.modules = opt.modules; // module load ...
-    this.gres = opt.gres; // gres sbatch option for GPU
+    this.submitBin = opt.submitBin;
     this.cmd = 'cmd' in opt ? opt.cmd : null; //the set of shell command to sbatch
     this.script = 'script' in opt ? opt.script : null; //the shell script to sbatch
     this.exportVar = 'exportVar' in opt ? opt.exportVar : null; //the shell script variable to export
+    this.inputs = 'inputs' in opt ? opt.inputs : null; //the set inputs to copy in the $CWD/input folder
+
     this.port = opt.port;
     this.adress = opt.adress;
     this.rootDir = opt.rootDir;
@@ -143,26 +148,61 @@ var Job = function (opt) {
     this.cwdClone = 'cwdClone' in opt ? opt.cwdClone : false;
 
     this.MIA_jokers = 3; //  Number of time a job is allowed to not be found in the squeue
+    this.modules = 'modules' in opt ? opt.modules : []; //the set of module to load
+
+    /*jobObject.modules.forEach(function(e) {
+        string += "module load " + e + '\n';
+    });*/
 
     //console.dir(opt);
     //console.log(">>>>>> " + this.sbatch);
     var self = this;
-    fs.mkdir(this.workDir, function (err) {
+    mkdirp(this.workDir+ "/input", function (err) {
         if (err)
             throw 'failed to create job ' + self.id + ' directory, ' + err;
         fs.chmod(self.workDir,'777', function(err){
             if (err)
                 throw 'failed to change perm job ' + self.id + ' directory, ' + err;
             self.emit('workspaceCreated');
+            self.setInput();
             self.setUp(opt);
         });
     });
+
+    /*fs.mkdir(this.workDir, function (err) {
+        if (err)
+            throw 'failed to create job ' + self.id + ' directory, ' + err;
+        fs.chmod(self.workDir,'777', function(err){
+            if (err)
+                throw 'failed to change perm job ' + self.id + ' directory, ' + err;
+            self.emit('workspaceCreated');
+            self.setInput();
+            self.setUp(opt);
+        });
+    });
+    */
 };
 
 Job.prototype = Object.create(Core.prototype);
 Job.prototype.constructor = Job;
 
 /* Job Methods */
+Job.prototype.setInput = function () {
+    for (var inputValue in this.inputs) {
+        if (util.isString(inputValue)) {
+            if (fs.existsSync(path)) {
+                // Do something
+                fs.createReadStream(inputValue).pipe(fs.createWriteStream(this.workDir + '/input/' + path.basename(inputValue)));
+            } else {
+                console.warn("Supplied input \"" + inputValue + "\"was guessed a path to a file but no file found")
+            }
+        }
+        else if (isStream(inputValue)) {
+            // Where do we dump it ?
+        }
+        // Stream case
+    }
+}
 
 // Process argument to create the string which will be dumped to an sbatch file
 Job.prototype.setUp = function(data) {
@@ -170,45 +210,14 @@ Job.prototype.setUp = function(data) {
     var customCmd = false;
     this.emulated = 'emulated' in data ? data.emulated ? true : false :false;
 
-    if ('partition' in data){
-        this.partition = data.partition;
-    }
-    if ('qos' in data){
-        this.qos = data.qos;
-    }
-    if ('cmd' in data) {
-        this.cmd = data.cmd;
-    }
-    if ('uid' in data){
-        this.uid = data.uid;
-    }
-    if ('gid' in data){
-        this.gid = data.gid;
-    }
-    if ('nNodes' in data){
-        this.nNodes = data.nNodes;
-    }
-    if ('nCores' in data){
-        this.nCores = data.nCores;
-    }
-    if ('tWall' in data){
-        this.tWall = data.tWall;
-    }
-    if ('modules' in data){
-        this.modules = data.modules;
-    }
-    if ('gres' in data){
-        this.gres = data.gres;
-    }
-
     batchDumper(this).on('ready', function (string){
-        var fname = self.workDir + '/' + self.id + '.sbatch';
-        if (self.emulated) fname = self.workDir + '/' + self.id + '.sh';
+        var fname = self.workDir + '/' + self.id + '.batch';
+        //if (self.emulated) fname = self.workDir + '/' + self.id + '.sh';
         fs.writeFile(fname, string, function(err) {
             if(err) {
                 return console.log(err);
             }
-            console.log("sbatch command written to " + fname);
+            console.log("batch command written to " + fname);
             //process.exit();
             if (self.emulated)
                 self.fork(fname);
@@ -233,10 +242,8 @@ Job.prototype.submit = function(fname) {
     //    sbatchArgArray.push(expString);
     //}
 
-    console.log('sbatch w/, ' + this.sbatch + sbatchArgArray);
-    console.log('this.sbatch : >' + this.batch + '<');
-    console.log('sbatchArgArray : >' + sbatchArgArray + '<');
-    console.log('this.workdir : >' + this.workDir + '<');
+    console.log('submitting w/, ' + this.sbatch + sbatchArgArray);
+    console.log('workdir : >' + this.workDir + '<');
     var process = spawn(this.batch, sbatchArgArray, { 'cwd' : this.workDir });
     process.on('exit', function () {
         self.emitter.emit('submitted', self);

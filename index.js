@@ -10,9 +10,6 @@ var sgeLib = require('./lib/sge');
 var slurmLib = require('./lib/slurm');
 var engine = null;
 
-var sbatchPath = 'sbatch';
-var squeuePath = 'squeue';
-
 var TCPport = 2222;
 var TCPip = null;
 var scheduler_id = uuid.v4();
@@ -62,19 +59,13 @@ var _checkBinariesSpecs = function(opt) {
             throw(msg);
     engine.configure(opt);
 }
-/**
- * perform a squeue action
- *
- * @param  {String}JobID, optional
- * @return {String}
- */
+
+
+var drawJobNumber = function () {
+    return uuid.v4();
+}
+
 module.exports = {
-    /**
-    * Expose the module emitter, mostly for signaling exhaustion of the job pool
-    *
-    * @param  {String}eventName, {Function}callback
-    * @return N/A
-    */
     engine : function(){ return engine;},
     emulate : function(){ emulator = true; },
     isEmulated : function(){ return emulator; },
@@ -252,24 +243,26 @@ module.exports = {
     * @param  {Object}JobSpecs
     * @return {EventEmitter} jobEmitter
     */
-    push : function(jobOpt) {
-        console.log("jobOpt");
+    push : function(jobProfileString, jobOpt) {
+        console.log("jobProfile: " + jobProfileString + "\njobOpt:\n");
         console.log(jobOpt);
+        var jobID = drawJobNumber();
         var self = this;
-        if (jobOpt.hasOwnProperty('generic') || jobOpt.hasOwnProperty('specific')) jobOpt = self.concatJson(jobOpt.generic,jobOpt.specific);
-
-        var jobTemplate = engine.createJobTemplate(jobOpt);
-        jobTemplate.rootDir = cacheDir
-        jobTemplate.emulated = emulator ? true : false,
-        jobTemplate.adress = TCPip;
-        jobTemplate.port = TCPport;
-        jobTemplate.engineHeader;
-        jobTemplate.script = 'script' in jobOpt ? jobOpt.script : null;
+        /* Define the new job parameters */
+        // We now expect an inputs parameter which has to be a list
+        var jobTemplate = {
+            "engineHeader" : engine.generateHeader(jobProfileString, jobOpt),
+            "rootDir" : cacheDir,
+            "emulated" : emulator ? true : false,
+            "adress" : TCPip,
+            "port" : TCPport,
+            "submitBin" : engine.submitBin(),
+            "script" : 'script' in jobOpt ? jobOpt.script : null,
+            "inputs" : 'inputs' in jobOpt ? jobOpt.inputs : null
+             };
         var newJob = jobLib.createJob(jobTemplate);
-/*	if ('gid' in jobOpt) newJob['gid'] = jobOpt.gid;
-        if ('uid' in jobOpt) newJob['uid'] = jobOpt.uid;
-*/
-	    jobsArray[newJob.id] = { 'obj' : newJob, 'status' : 'CREATED' };
+
+	    jobsArray[jobID] = { 'obj' : newJob, 'status' : 'CREATED' };
         self.jobsView();
 
         newJob.emitter.on('submitted', function(j){

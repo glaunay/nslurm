@@ -52,6 +52,8 @@ process.argv.forEach(function (val, index, array){
         if (! array[index + 1])
             throw("usage : ");
         bean = parseConfig(array[index + 1]);
+        console.log("Config file content:\n");
+        console.dir(bean);
     }
 });
 
@@ -64,8 +66,13 @@ jobManager.configure({"engine" : engineType, "binaries" : bean.binaries });
 
 jobManager.engine().list()
     .on('data', function(msg) {
-        console.log(msg);//process.exit();
+        console.log("Testing engine list function");
+        console.dir(msg);//process.exit();
+
     });
+// GO AHEAD LETS PARSE ACTUAL FORK AND RETRIEVE THE JOB ID AND STATUS
+
+/*
 
 jobManager.start({ 'cacheDir' : bean.cacheDir,
           'tcp' : tcp,
@@ -74,8 +81,15 @@ jobManager.start({ 'cacheDir' : bean.cacheDir,
 jobManager.on('exhausted', function(){
         console.log("All jobs processed");
     });
-jobManager.push(bean.jobSettings);
-jobManager.on("completed", function(stdout, stderr, jObj) {
-    console.log("SMTG FINISHED");
 
+var testJob = jobManager.push(bean.test.keyProfile, bean.test.jobSettings);
+
+testJob.on("completed", function(stdout, stderr, jObj) {
+    var content = '';
+    stdout.on('data', function(buf) { content += buf.toString(); });
+    stdout.on('end', function() {
+        console.log(content);
+    });
 });
+*/
+

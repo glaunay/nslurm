@@ -1,0 +1,19 @@
+{
+    "comments": "nslurm arwen config file",
+    "engineType": "slurm",
+    "port": "3001",
+    "tcp": "192.168.114.253",
+    "cacheDir": "/home/glaunay/tmp",
+    "binaries": {
+        "cancelBin": "/opt/slurm/bin/scancel",
+        "submitBin": "/opt/slurm/bin/sbatch",
+        "queueBin": "/opt/slurm/bin/squeue"
+    },
+    "test": {
+        "keyProfile": "arwen_express",
+        "jobSettings": {
+            "cmd": "sleep 20;echo \"This is stdout of test job\"",
+            "inputs": []
+        }
+    }
+}

@@ -8,6 +8,7 @@ var clone = require('clone');
 
 var sgeLib = require('./lib/sge');
 var slurmLib = require('./lib/slurm');
+var emulatorLib = require('./lib/emulator');
 var engine = null;
 
 var TCPport = 2222;
@@ -42,7 +43,7 @@ var configure = function (opt) {
     else if(opt.engine === "slurm")
         engine = slurmLib;
     else if (opt.engine === "emulator")
-
+        engine = emulatorLib;
     if (opt.engine != "emulator") {
         if(!opt.hasOwnProperty('binaries')) throw "You must specify scheduler engine binaries";
         //_setBinariesSpecs(opt.binaries);
@@ -203,13 +204,16 @@ module.exports = {
     jobWarden : function () {
         var emitter = new events.EventEmitter();
         engine.list().on('data', function (d) {
+            //console.log("ENGINE.LIST DATA");
+            //console.dir(d);
+
             for (var key in jobsArray) {
-                var curr_job =jobsArray[key];
+                var curr_job = jobsArray[key];
                 if(curr_job.status === "CREATED"){
                     continue;
                 }
 
-                if (d.nameUUID.indexOf(key) === -1) { // if key is not found in squeue
+                if (d.nameUUID.indexOf(key) === -1) { // if key is not found in listed jobs
                     curr_job.obj.MIA_jokers -= 1;
                     console.log('The job "' + key + '" missing from queue! Jokers left is ' +  curr_job.obj.MIA_jokers);
                     if (curr_job.obj.MIA_jokers === 0) {
@@ -251,14 +255,16 @@ module.exports = {
         /* Define the new job parameters */
         // We now expect an inputs parameter which has to be a list
         var jobTemplate = {
-            "engineHeader" : engine.generateHeader(jobProfileString, jobOpt),
+            "id" : jobID,
+            "engineHeader" : engine.generateHeader(jobID, jobProfileString/*, jobOpt*/),
             "rootDir" : cacheDir,
             "emulated" : emulator ? true : false,
             "adress" : TCPip,
             "port" : TCPport,
             "submitBin" : engine.submitBin(),
             "script" : 'script' in jobOpt ? jobOpt.script : null,
-            "inputs" : 'inputs' in jobOpt ? jobOpt.inputs : null
+            "cmd" : 'cmd' in jobOpt ? jobOpt.cmd : null,
+            "inputs" : 'inputs' in jobOpt ? jobOpt.inputs : []
              };
         var newJob = jobLib.createJob(jobTemplate);
 
@@ -459,7 +465,7 @@ module.exports = {
 // Private Module functions
 
 function _parseMessage(string) {
-    console.log("trying to parse " + string);
+    //console.log("trying to parse " + string);
     var re = /^JOB_STATUS[\s]+([\S]+)[\s]+([\S]+)$/
     var matches = string.match(re);
     if (! matches) return;
@@ -476,11 +482,9 @@ function _parseMessage(string) {
     console.log('Status Updating [job ' + jid + ' ] : from \'' +
                 jobsArray[jid].status  + '\' to \'' + uStatus + '\'');
     jobsArray[jid].status = uStatus;
-    if (uStatus === 'START') {
-        // console.log(jobsArray[jid]);
+    if (uStatus === 'START')
         jobsArray[jid].obj.emitter.emit('jobStart', jobsArray[jid].obj);
-    }
-    if (uStatus === "FINISHED")
+    else if (uStatus === "FINISHED")
         _pull(jid);
 };
 

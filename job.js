@@ -35,7 +35,7 @@ var batchDumper = function (job){
     var trailer = 'echo -n  "JOB_STATUS ' + job.id + ' FINISHED"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n";
 
     if (!job.emulated) {
-        string += this.engineHeader; /// HERE
+        string += job.engineHeader; /// HERE
 // Sbatch command content
         string += 'echo -n  "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + job.adress + ' ' + job.port + " > /dev/null\n"
 
@@ -66,7 +66,7 @@ var batchDumper = function (job){
     // just for tests
     } else {
         string += job.cmd ? job.cmd : defaultCommand;
-        string += trailer;
+        string += "\n" + trailer;
         setTimeout(function(){
             emitter.emit('ready', string);
         }, 5);
@@ -127,9 +127,11 @@ TODO
 
 /* Job constructor */
 var Job = function (opt) {
-    if (!opt.hasOwnProperty(id)) {
+    if (!opt.hasOwnProperty('id')) {
         throw ("Job constructor must be provided an uuid");
     }
+    console.log("JOB OPTION CONTENT\n");
+    console.dir(opt);
     Core.call(this, opt);
     this.batch = opt.batch;
     this.engineHeader = opt.engineHeader;
@@ -217,7 +219,6 @@ Job.prototype.setUp = function(data) {
             if(err) {
                 return console.log(err);
             }
-            console.log("batch command written to " + fname);
             //process.exit();
             if (self.emulated)
                 self.fork(fname);
@@ -233,7 +234,7 @@ Job.prototype.submit = function(fname) {
     // do submission, raise submit 'event'
     // shell command
     //console.log(this.sbatch + ' ' + fname + ' ' + this.workDir);
-    var sbatchArgArray = [fname];
+    var submitArgArray = [fname];
 
     // USELESS : no "export" variable in Job object
     //if (this.export) {
@@ -242,18 +243,20 @@ Job.prototype.submit = function(fname) {
     //    sbatchArgArray.push(expString);
     //}
 
-    console.log('submitting w/, ' + this.sbatch + sbatchArgArray);
+    /*
+    console.log('submitting w/, ' + this.submitBin + submitArgArray);
     console.log('workdir : >' + this.workDir + '<');
-    var process = spawn(this.batch, sbatchArgArray, { 'cwd' : this.workDir });
+    */
+    var process = spawn(this.submitBin, submitArgArray, { 'cwd' : this.workDir });
     process.on('exit', function () {
         self.emitter.emit('submitted', self);
     });
 }
 
 Job.prototype.fork = function(fname) {
-    var sbatchArgArray = [fname];
-    console.log('local [' + this.workDir + '] forking w/ bash ' + sbatchArgArray);
-    var process = spawn('sh', sbatchArgArray,
+    var submitArgArray = [fname];
+    console.log('local [' + this.workDir + '] forking w/ bash ' + submitArgArray);
+    var process = spawn('sh', submitArgArray,
                  { 'cwd' : this.workDir });
     if(this.emulated) {
         this.stdio = process.stdout;

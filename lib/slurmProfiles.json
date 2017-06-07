@@ -9,6 +9,10 @@
             "partition": "mpi-mobi",
             "qos": "mpi-mobi"
         },
+        "arwen_express": {
+            "partition": "express-mobi",
+            "qos": "express-mobi"
+        },
         "arwen-dev_gpu": {
             "partition": "gpu",
             "qos": "gpu",

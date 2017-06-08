@@ -34,17 +34,10 @@ var batchDumper = function (job){
     var adress = job.emulated ? 'localhost' : job.adress;
     var trailer = 'echo -n  "JOB_STATUS ' + job.id + ' FINISHED"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n";
 
-    if (!job.emulated) {
-        string += job.engineHeader; /// HERE
-// Sbatch command content
-        string += 'echo -n  "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + job.adress + ' ' + job.port + " > /dev/null\n"
+    string += job.engineHeader; /// ENGINE SPECIFIC PREPROCESSOR LINES
 
-    } else { // wrapper sbatch script for local/fork usage
-        string += 'echo -n  "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n"
-       // string += 'WORKDIR=' + job.cwd;
-    }
-    // DONT DO THAT
-    //string += 'export WORKDIR=' + job.workDir + '\n';
+    string += 'echo -n  "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n"
+
     if (job.exportVar) {
         for (var key in job.exportVar) {
             //string += 'export ' + key + '=' + job.exportVar[key] + '\n';
@@ -152,12 +145,7 @@ var Job = function (opt) {
     this.MIA_jokers = 3; //  Number of time a job is allowed to not be found in the squeue
     this.modules = 'modules' in opt ? opt.modules : []; //the set of module to load
 
-    /*jobObject.modules.forEach(function(e) {
-        string += "module load " + e + '\n';
-    });*/
 
-    //console.dir(opt);
-    //console.log(">>>>>> " + this.sbatch);
     var self = this;
     mkdirp(this.workDir+ "/input", function (err) {
         if (err)
@@ -171,24 +159,14 @@ var Job = function (opt) {
         });
     });
 
-    /*fs.mkdir(this.workDir, function (err) {
-        if (err)
-            throw 'failed to create job ' + self.id + ' directory, ' + err;
-        fs.chmod(self.workDir,'777', function(err){
-            if (err)
-                throw 'failed to change perm job ' + self.id + ' directory, ' + err;
-            self.emit('workspaceCreated');
-            self.setInput();
-            self.setUp(opt);
-        });
-    });
-    */
 };
 
 Job.prototype = Object.create(Core.prototype);
 Job.prototype.constructor = Job;
 
 /* Job Methods */
+
+// Copy specified inputs in the jobDir input folder
 Job.prototype.setInput = function () {
     for (var inputValue in this.inputs) {
         if (util.isString(inputValue)) {
@@ -243,10 +221,10 @@ Job.prototype.submit = function(fname) {
     //    sbatchArgArray.push(expString);
     //}
 
-    /*
-    console.log('submitting w/, ' + this.submitBin + submitArgArray);
+
+    console.log('submitting w/, ' + this.submitBin + " " + submitArgArray);
     console.log('workdir : >' + this.workDir + '<');
-    */
+
     var process = spawn(this.submitBin, submitArgArray, { 'cwd' : this.workDir });
     process.on('exit', function () {
         self.emitter.emit('submitted', self);

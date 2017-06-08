@@ -35,8 +35,9 @@ var isStarted = false;
 
 // Set scheduler engine and emulation state
 var configure = function (opt) {
-    console.log("############CONF###\n");
+    console.log("\n\n############ENGINE CONFIGURATION OPTIONS############\n");
     console.dir(opt);
+    console.log("\n####################################################\n");
     if(!opt.hasOwnProperty('engine')) throw("Please specify a scheduler engine");
     if(opt.engine === "sge")
         engine = sgeLib;

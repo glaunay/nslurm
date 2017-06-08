@@ -11,7 +11,7 @@ sudo yum -y install git
 sudo yum -y install -y gcc-c++ make
 curl -sL https://rpm.nodesource.com/setup_6.x | sudo -E bash -
 sudo yum -y install nodejs
-
+sudo yum -y install nc
 
 export CLUSTER_QUEUELIST_CMD=`which qstat`
 export CLUSTER_QUEUESUB_CMD=`which qsub`
@@ -19,27 +19,32 @@ export CLUSTER_QUEUEDEL_CMD=`which qdel`
 
 HOME_DIR=`pwd`
 CACHE_DIR=$HOME_DIR/cacheDir
-sudo chmod a+w $CACHE_DIR
+mkdir $CACHE_DIR
+
 
 PRIVATE_IP=`awk '$2 == "master" {print $1;exit}' /etc/hosts`
-mkdir $CACHE_DIR
+
 
 
 cat << EOF > $HOME_DIR/configuration.json
 {
+    "comments": "Automatically generated IFB-sge config file",
     "binaries" : {
         "cancelBin" : $CLUSTER_QUEUEDEL_CMD,
         "queueBin"  : $CLUSTER_QUEUELIST_CMD,
-        "submitBin" : $CLUSTER_QUEUELIST_CMD
+        "submitBin" : $CLUSTER_QUEUESUB_CMD
   },
   "cacheDir" : $CACHE_DIR,
   "port" : 5000,
   "tcp" : $PRIVATE_IP,
   "engineType" : "sge",
-    "jobSettings" : {
-        "user" : "ifbuser",
-        "script" : "/home/ifbuser/dummyTask.sh"
-  }
+  "test": {
+        "keyProfile": "ifb_basic",
+        "jobSettings": {
+            "cmd": "sleep 20;echo \"This is stdout of test job\"",
+            "inputs": []
+        }
+    }
 }
 EOF
 
@@ -63,6 +68,8 @@ cat << EOF > $HOME_DIR/dummy.qsub
 
 ls
 pwd -P
+sleep 30
 EOF
 
-sleep 300
+sudo chmod a+wrx $CACHE_DIR $HOME_DIR/dummy.qsub $HOME_DIR/dummy.sh $HOME_DIR/configuration.json
+

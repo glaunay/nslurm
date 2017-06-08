@@ -1,0 +1,8 @@
+{
+    "comments": "Definition of sge set of preprocessors options values",
+    "definitions": {
+        "ifb_basic": {
+            "user" : "ifbuser"
+        }
+    }
+}

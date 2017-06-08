@@ -1,10 +1,3 @@
-/*var should = require('chai').should(),
-    nSlurm = require('../index'),
-    squeue = nSlurm.squeue,
-    submit = nSlurm.squeue;
-
-    */
-/* qbatch;nc->sbatch->nc */
 var jsonfile = require('jsonfile');
 var events = require('events');
 
@@ -22,9 +15,6 @@ var cacheDir, port, tcp, engineType;
 var bean = {};
 
 process.argv.forEach(function (val, index, array){
-    /*if (val === '--local') bLocal = true;
-    if (val === '--gpu') ardockFunc = PDB_Lib.arDock_gpu;
-    */
     if (val === '-p'){
         if (! array[index + 1])
             throw("usage : ");
@@ -68,11 +58,7 @@ jobManager.engine().list()
     .on('data', function(msg) {
         console.log("Testing engine list function");
         console.dir(msg);
-
     });
-// GO AHEAD LETS PARSE ACTUAL FORK AND RETRIEVE THE JOB ID AND STATUS
-
-
 
 jobManager.start({ 'cacheDir' : bean.cacheDir,
           'tcp' : tcp,
@@ -91,4 +77,3 @@ testJob.on("completed", function(stdout, stderr, jObj) {
         console.log(content);
     });
 });
-

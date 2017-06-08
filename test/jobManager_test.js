@@ -67,12 +67,12 @@ jobManager.configure({"engine" : engineType, "binaries" : bean.binaries });
 jobManager.engine().list()
     .on('data', function(msg) {
         console.log("Testing engine list function");
-        console.dir(msg);//process.exit();
+        console.dir(msg);
 
     });
 // GO AHEAD LETS PARSE ACTUAL FORK AND RETRIEVE THE JOB ID AND STATUS
 
-/*
+
 
 jobManager.start({ 'cacheDir' : bean.cacheDir,
           'tcp' : tcp,
@@ -91,5 +91,4 @@ testJob.on("completed", function(stdout, stderr, jObj) {
         console.log(content);
     });
 });
-*/
 

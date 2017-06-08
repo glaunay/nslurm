@@ -42,11 +42,12 @@ var configure = function (opt) {
         engine = sgeLib;
     else if(opt.engine === "slurm")
         engine = slurmLib;
-    else if (opt.engine === "emulator")
+    else if (opt.engine === "emulator") {
         engine = emulatorLib;
+        emulator = true;
+    }
     if (opt.engine != "emulator") {
         if(!opt.hasOwnProperty('binaries')) throw "You must specify scheduler engine binaries";
-        //_setBinariesSpecs(opt.binaries);
     }
     engine.configure(opt.binaries, jobsArray);
     console.log("Engine configured is " + engine.type());
@@ -204,8 +205,8 @@ module.exports = {
     jobWarden : function () {
         var emitter = new events.EventEmitter();
         engine.list().on('data', function (d) {
-            //console.log("ENGINE.LIST DATA");
-            //console.dir(d);
+            console.log("ENGINE.LIST DATA");
+            console.dir(d);
 
             for (var key in jobsArray) {
                 var curr_job = jobsArray[key];

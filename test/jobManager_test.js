@@ -69,6 +69,8 @@ jobManager.on('exhausted', function(){
     });
 
 var testJob = jobManager.push(bean.test.keyProfile, bean.test.jobSettings);
+var testJob2 = jobManager.push(bean.test.keyProfile, bean.test.jobSettings);
+var testJob3 = jobManager.push(bean.test.keyProfile, bean.test.jobSettings);
 
 testJob.on("completed", function(stdout, stderr, jObj) {
     var content = '';
@@ -77,3 +79,27 @@ testJob.on("completed", function(stdout, stderr, jObj) {
         console.log(content);
     });
 });
+
+
+
+// if stopping the process using Ctrl + C
+process.on('SIGINT', function () {
+    console.log(' Try to close the jobManager processes...');
+    jobManager.stop()
+    .on('cleanExit', function () {
+        process.exit(0);
+    })
+    .on('exit', function () {
+        process.exit(0);
+    })
+    .on('cancelError', function () {
+        process.exit(1);
+    })
+    .on('errSqueue', function () {
+        process.exit(1);
+    });
+});
+
+
+
+

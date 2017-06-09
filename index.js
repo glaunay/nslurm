@@ -368,7 +368,7 @@ module.exports = {
     * Try to kill all sbatch jobs of this process,
     * by viewing the jobIds defined in nslurm,
     * and comparing them to the jobIds defined in slurm.
-    * It needs to use the squeue and scancel commands.
+    * It needs to use the engine API .
     */
     stop : function(bean, tagTask) {
         var self = this;

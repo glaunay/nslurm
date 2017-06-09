@@ -27,16 +27,27 @@ var _copyScript = function (job, fname, string, emitter) {
     src.pipe(wr);
 }
 
+var jobIdentityFileWriter = function (job) {
+    var serial = {};
+
+    if (job.cmd) serial['cmd'] = job.cmd;
+    if (job.script) serial['script'] = job.script;
+    if (job.exportVar) serial['exportVar'] = job.exportVar;
+    if (job.modules) serial['modules'] = job.modules;
+
+    var json = JSON.stringify(serial);
+    fs.writeFileSync(job.workDir + '/jobID.json', json, 'utf8');
+}
 
 var batchDumper = function (job){
     var emitter = new events.EventEmitter();
     var string = "#!/bin/bash\n";
     var adress = job.emulated ? 'localhost' : job.adress;
-    var trailer = 'echo -n  "JOB_STATUS ' + job.id + ' FINISHED"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n";
+    var trailer = 'echo "JOB_STATUS ' + job.id + ' FINISHED"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n";
 
     string += job.engineHeader; /// ENGINE SPECIFIC PREPROCESSOR LINES
 
-    string += 'echo -n  "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n"
+    string += 'echo "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n"
 
     if (job.exportVar) {
         for (var key in job.exportVar) {
@@ -197,6 +208,7 @@ Job.prototype.setUp = function(data) {
             if(err) {
                 return console.log(err);
             }
+            jobIdentityFileWriter(self);
             //process.exit();
             if (self.emulated)
                 self.fork(fname);

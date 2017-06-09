@@ -87,15 +87,23 @@ process.on('SIGINT', function () {
     console.log(' Try to close the jobManager processes...');
     jobManager.stop()
     .on('cleanExit', function () {
+        console.log("All pending jobs killed");
         process.exit(0);
     })
-    .on('exit', function () {
+    .on('leftExit', function (nbLeft) {
+        console.log(nbLeft + " jobs left pending");
         process.exit(0);
     })
-    .on('cancelError', function () {
+    .on('emptyExit', function () {
+        console.log("No job to kill")
+        process.exit(0);
+    })
+    .on('cancelError', function (err) {
+        console.log("Error during pending job cancelation");
         process.exit(1);
     })
-    .on('errSqueue', function () {
+    .on('listError', function (err) {
+        console.log("Error during pending job listing");
         process.exit(1);
     });
 });

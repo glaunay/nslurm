@@ -1,0 +1,19 @@
+{
+    "comments": "laptop config file",
+    "engineType": "emulator",
+    "port": "3001",
+    "tcp": "localhost",
+    "cacheDir": "/Users/guillaumelaunay/tmp/nslurmCacheDir",
+    "binaries": {
+        "cancelBin": null,
+        "submitBin": null,
+        "queueBin": null
+    },
+    "test": {
+        "keyProfile": null,
+        "jobSettings": {
+            "cmd": "sleep 20;echo \"This is stdout of test job\"",
+            "inputs": []
+        }
+    }
+}

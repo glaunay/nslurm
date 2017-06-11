@@ -33,7 +33,17 @@ var emulator = false; // Trying to keep api/events intact while running job as f
 
 var isStarted = false;
 
+var debugMode = false;
 
+/*****************
+    jobManager events
+'unregistredJob'
+'ready'
+'error'
+'exhausted'
+'listening'
+'wardenError'
+******************/
 /**
 * Set scheduler engine and emulation states
 *
@@ -221,18 +231,10 @@ module.exports = {
     /*
      * Check the existence of our jobs (present in jobsArray) in the engine processes list.
      * @param  None
-     * @return {Object}Emitter storing process IDs, job  UUID, partition and status
-     * Emitter exposes following event:
-     *         ('lostJob', {Object}jobObject) : any job not found in the process pool
-     *         (listError, {String}error) : the engine failed to list process along with error message
-     *
-     */
+     * @return {Object}jobObject
+    */
     jobWarden: function() {
-        var emitter = new events.EventEmitter();
         engine.list().on('data', function(d) {
-         /*   console.log("ENGINE.LIST DATA");
-            console.dir(d);
-        */
             for (var key in jobsArray) {
                 var curr_job = jobsArray[key];
                 if (curr_job.status === "CREATED") {
@@ -246,8 +248,6 @@ module.exports = {
                         var jobTmp = clone(curr_job); // deepcopy of the disappeared job
                         jobTmp.obj.emitter = curr_job.obj.emitter; // keep same emitter reference
                         delete jobsArray[key];
-                        // console.log("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-                        // console.log(jobTmp);
                         jobTmp.obj.emitter.emit('lostJob', 'The job "' + key + '" is not in the queue !', jobTmp.obj);
                     }
                 } else {
@@ -259,20 +259,22 @@ module.exports = {
             }
             //emitter.emit('');
         }).on('listError', function(err) {
-            console.log('ERROR with engine list method :');
-            console.log(err);
-            emitter.emit('listError');
+            eventEmitter.emit("wardenError", err)
         });
-        return emitter;
+    //    return emitter;
     },
 
 
     /**
      * Submit a job to manager,
      *
-     * @param  {String}jobProfileString : a key refering to profile settings aknowledge by the engine
+     * @param  {String}jobProfileString : a key refering to profile settings acknowledge by the engine
      * @param  {Object}jobOpt : a litteral describing parameters for this particular job instance
      * @return {EventEmitter}jobEmitter : emitter bound to the job
+            the following events are exposed :
+                scriptReadError
+                scriptWriteError
+                scriptSetPermissionError
      */
     push: function(jobProfileString, jobOpt) {
         /*console.log("jobProfile: " + jobProfileString + "\njobOpt:\n");
@@ -282,6 +284,7 @@ module.exports = {
         /* Define the new job parameters */
         // We now expect an inputs parameter which has to be a list
         var jobTemplate = {
+            "debugMode" : debugMode,
             "id": jobID,
             "engineHeader": engine.generateHeader(jobID, jobProfileString /*, jobOpt*/ ),
             "rootDir": cacheDir,
@@ -291,7 +294,8 @@ module.exports = {
             "submitBin": engine.submitBin(),
             "script": 'script' in jobOpt ? jobOpt.script : null,
             "cmd": 'cmd' in jobOpt ? jobOpt.cmd : null,
-            "inputs": 'inputs' in jobOpt ? jobOpt.inputs : []
+            "inputs": 'inputs' in jobOpt ? jobOpt.inputs : [],
+            "exportVar" : 'exportVar' in jobOpt ? jobOpt.exportVar : null
         };
         var newJob = jobLib.createJob(jobTemplate);
 
@@ -299,17 +303,17 @@ module.exports = {
             'obj': newJob,
             'status': 'CREATED'
         };
-        self.jobsView();
+        if(debugMode)
+            self.jobsView();
 
         newJob.emitter.on('submitted', function(j) {
             //console.log(j);
             jobsArray[j.id].status = 'SUBMITTED';
-            self.jobsView();
+            if(debugMode)
+                self.jobsView();
         }).on('jobStart', function(job) {
             // next lines for tests on squeueReport() :
-            // self.squeueReport().on('end', function (interface) {
-            //     console.log(interface.matchPartition('ws-'));
-            // });
+            engine.list()
         })
 
         exhaustBool = true;
@@ -347,23 +351,24 @@ module.exports = {
         if (opt.hasOwnProperty('probPreviousCacheDir')) {
             probPreviousCacheDir = opt.probPreviousCacheDir;
         }
-
-        console.log("Attempting to create cache for process at " + cacheDir);
+        if(debugMode)
+            console.log("Attempting to create cache for process at " + cacheDir);
         try {
             fs.mkdirSync(cacheDir);
         } catch (e) {
             if (e.code != 'EEXIST') throw e;
             console.log("Cache found already found at " + cacheDir);
         }
-
-        console.log('[' + TCPip + '] opening socket at port ' + TCPport);
+        if(debugMode)
+            console.log('[' + TCPip + '] opening socket at port ' + TCPport);
         var s = _openSocket(TCPport);
         data = '';
         s.on('listening', function(socket) {
-                eventEmitter.emit("ready");
                 isStarted = true;
-                console.log("Starting pulse monitoring");
-                console.log("cache Directory is " + cacheDir);
+                if(debugMode) {
+                    console.log("Starting pulse monitoring");
+                    console.log("cache Directory is " + cacheDir);
+                }
                 core = setInterval(function() {
                     _pulse()
                 }, 500);
@@ -371,21 +376,10 @@ module.exports = {
                     self.jobWarden()
                 }, 5000);
 
-                /*socket.on('data', function (chunk) {
-                    data += chunk.toString();
-                    console.log(chunk.toString());
-                })*/
+                console.log("       --->jobManager " + scheduler_id + " ready to process jobs<---\n\n");
+                eventEmitter.emit("ready");
             })
-            .on('data', function(data) { // TO RESUME HERE
-                _parseMessage(data);
-                // parse job id
-
-                // clean ref in arrayJob
-
-                //raise the "finish" event in job.emit("finish");
-
-            });
-
+            .on('data', _parseMessage);
     },
 
 
@@ -407,6 +401,10 @@ module.exports = {
         return emitter;
     },
 
+    debugOn : function() {
+        debugMode = true;
+    },
+
     set_id: function(val) {
         id = val
     },
@@ -415,9 +413,6 @@ module.exports = {
     },
 
 };
-
-
-// Private Module functions
 
 function _parseMessage(string) {
     //console.log("trying to parse " + string);
@@ -428,14 +423,15 @@ function _parseMessage(string) {
     var jid = matches[1];
     var uStatus = matches[2];
     if (!jobsArray.hasOwnProperty(jid)) {
-        console.log('unregistred job id ' + jid);
+        if(debugMode)
+            console.log('unregistred job id ' + jid);
         eventEmitter.emit('unregistredJob', jid);
         return;
         //throw 'unregistred job id ' + jid;
     }
-
-    console.log('Status Updating [job ' + jid + ' ] : from \'' +
-        jobsArray[jid].status + '\' to \'' + uStatus + '\'');
+    if(debugMode)
+        console.log('Status Updating [job ' + jid + ' ] : from \'' +
+            jobsArray[jid].status + '\' to \'' + uStatus + '\'');
     jobsArray[jid].status = uStatus;
     if (uStatus === 'START')
         jobsArray[jid].obj.emitter.emit('jobStart', jobsArray[jid].obj);
@@ -444,7 +440,8 @@ function _parseMessage(string) {
 };
 
 function _pull(jid) { //handling job termination
-    console.log("Pulling " + jid);
+    if(debugMode)
+        console.log("Pulling " + jid);
     //console.dir(jobsArray[jid]);
     var jRef = jobsArray[jid];
     delete jobsArray[jid];
@@ -453,12 +450,11 @@ function _pull(jid) { //handling job termination
     jRef.obj.emit("completed",
         stdout, stderr, jRef.obj
     );
-    // Does object persist ?
 };
 
 
 function _openSocket(port) {
-
+    var eventEmitterSocket = new events.EventEmitter();
     //var data = '';
 
     var server = net.createServer(function(socket) {
@@ -467,7 +463,7 @@ function _openSocket(port) {
         socket.on('data', function(buf) {
                 //console.log("incoming data");
                 //console.log(buf.toString());
-                eventEmitter.emit('data', buf.toString());
+                eventEmitterSocket.emit('data', buf.toString());
             })
             .on('error', function() {
                 // callback must be specified to trigger close event
@@ -481,8 +477,9 @@ function _openSocket(port) {
         eventEmitter.emit('error', e);
     });
     server.on('listening', function() {
-        console.log('Listening on ' + port + '...');
-        eventEmitter.emit('listening');
+        if(debugMode)
+            console.log('Listening on ' + port + '...');
+        eventEmitterSocket.emit('listening');
     });
     server.on('connection', function(s) {
 
@@ -495,30 +492,7 @@ function _openSocket(port) {
     });
 
 
-    return eventEmitter;
-}
-
-function _openSocketDRPEC(fileName) {
-    var rstream = null;
-    console.log("---> " + fileName);
-
-    var eventEmitter = new events.EventEmitter();
-    fs.stat(fileName, function(err, stat) {
-        console.log("pouet");
-        if (err == null) {
-            console.log('File exists');
-            rstream = fs.createReadStream(fileName);
-            eventEmitter.emit('open', rstream);
-        } else if (err.code == 'ENOENT') {
-            console.log("creating file")
-            fs.writeFile(fileName, 'Some log\n');
-            rstream = fs.createReadStream(fileName);
-            eventEmitter.emit('open', rstream);
-        } else {
-            eventEmitter.emit('error', err.code);
-        }
-    });
-    return eventEmitter;
+    return eventEmitterSocket;
 }
 
 function _pulse() {
@@ -530,9 +504,4 @@ function _pulse() {
             exhaustBool = false;
         }
     }
-    //console.log("boum");
 }
-var job_template = {
-    'name': 'john Doe',
-    'runtime': 'forever'
-};

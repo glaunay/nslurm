@@ -8,13 +8,61 @@ var parseConfig = function (fileName){
     return obj;
 };
 
+var scriptBatchTest = function() {
+    var template = require("./dummyJob/dummyJob.json");
+    var jobOpt = {
+            "inputs" : template.inputs,
+            "script" : template.script,
+            "exportVar" : template.exportVar
+        };
+    var testJob = jobManager.push(bean.test.keyProfile, jobOpt);
+    testJob.on("completed", function(stdout, stderr, jObj) {
+        var content = '';
+        stdout.on('data', function(buf) { content += buf.toString(); });
+        stdout.on('end', function() {
+            console.log(content);
+        });
+
+        if(stderr) {
+            var contentError = 'stderr content:\n';
+            stderr.on('data', function(buf) { contentError += buf.toString(); });
+            stderr.on('end', function() {
+                console.log(contentError);
+            });
+        }
+    });
+}
+
+var cmdBatchTest = function() {
+    var testJob = jobManager.push(bean.test.keyProfile, bean.test.jobSettings);
+    var testJob2 = jobManager.push(bean.test.keyProfile, bean.test.jobSettings);
+    var testJob3 = jobManager.push(bean.test.keyProfile, bean.test.jobSettings);
+
+    testJob.on("completed", function(stdout, stderr, jObj) {
+        var content = '';
+        stdout.on('data', function(buf) { content += buf.toString(); });
+        stdout.on('end', function() {
+            console.log(content);
+        });
+    });
+}
+
 
 
 
 var cacheDir, port, tcp, engineType;
 var bean = {};
-
+var testFunc = null;
 process.argv.forEach(function (val, index, array){
+    if (val === '--batch'){
+        testFunc = scriptBatchTest;
+    }
+    if (val === '--dbg') {
+        jobManager.debugOn();
+    }
+    if (val === '--cmd'){
+        testFunc = cmdBatchTest;
+    }
     if (val === '-p'){
         if (! array[index + 1])
             throw("usage : ");
@@ -47,7 +95,6 @@ process.argv.forEach(function (val, index, array){
     }
 });
 
-
 port = port ? port : bean.port;
 tcp = tcp ? tcp : bean.tcp;
 engineType = engineType ? engineType : bean.engineType;
@@ -68,20 +115,12 @@ jobManager.on('exhausted', function(){
         console.log("All jobs processed");
     });
 
-var testJob = jobManager.push(bean.test.keyProfile, bean.test.jobSettings);
-var testJob2 = jobManager.push(bean.test.keyProfile, bean.test.jobSettings);
-var testJob3 = jobManager.push(bean.test.keyProfile, bean.test.jobSettings);
-
-testJob.on("completed", function(stdout, stderr, jObj) {
-    var content = '';
-    stdout.on('data', function(buf) { content += buf.toString(); });
-    stdout.on('end', function() {
-        console.log(content);
-    });
-});
-
-
-
+if(testFunc) {
+    jobManager.on('ready', testFunc);
+} else {
+    console.log("No supplied submission test, exiting");
+    process.exit(0);
+}
 // if stopping the process using Ctrl + C
 process.on('SIGINT', function () {
     console.log(' Try to close the jobManager processes...');

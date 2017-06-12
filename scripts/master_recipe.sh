@@ -1,52 +1,44 @@
 #!/bin/bash
-
+source functions.sh
 # LOG AS ifbuser
 # THEN sudo su
-
 # GUESS THE PULBIC IP ADRESS ON OPEN STACK CLOUD
 # curl http://169.254.169.254/latest/meta-data/public-ipv4
 
 
-sudo yum -y install git
-sudo yum -y install -y gcc-c++ make
-curl -sL https://rpm.nodesource.com/setup_6.x | sudo -E bash -
-sudo yum -y install nodejs
-sudo yum -y install nc
+while [[ $# -gt 1 ]]
+do
+key="$1"
 
-export CLUSTER_QUEUELIST_CMD=`which qstat`
-export CLUSTER_QUEUESUB_CMD=`which qsub`
-export CLUSTER_QUEUEDEL_CMD=`which qdel`
+case $key in
+    #-e|--extension)
+    #EXTENSION="$2"
+    #shift # past argument
+    #;;
+    --master)
+    MASTER_DEPLOY=YES
+    ;;
+    --slave)
+    SLAVE_DEPLOY=YES
+    ;;
+    *)
+            # unknown option
+    ;;
+esac
+shift # past argument or value
+done
 
-HOME_DIR=`pwd`
-CACHE_DIR=$HOME_DIR/cacheDir
-mkdir $CACHE_DIR
+[ test -z $MASTER_DEPLOY ] || masterDeploy
+
+if ! test -z $SLAVE_DEPLOY;
+    then
+    ipAdr=getSlavesIPs
+    slaveDeploy $ipAdr
+fi
+
+exit
 
 
-PRIVATE_IP=`awk '$2 == "master" {print $1;exit}' /etc/hosts`
-
-
-
-cat << EOF > $HOME_DIR/configuration.json
-{
-    "comments": "Automatically generated IFB-sge config file",
-    "binaries" : {
-        "cancelBin" : $CLUSTER_QUEUEDEL_CMD,
-        "queueBin"  : $CLUSTER_QUEUELIST_CMD,
-        "submitBin" : $CLUSTER_QUEUESUB_CMD
-  },
-  "cacheDir" : $CACHE_DIR,
-  "port" : 5000,
-  "tcp" : $PRIVATE_IP,
-  "engineType" : "sge",
-  "test": {
-        "keyProfile": "ifb_basic",
-        "jobSettings": {
-            "cmd": "sleep 20;echo \"This is stdout of test job\"",
-            "inputs": []
-        }
-    }
-}
-EOF
 
 cat << EOF > $HOME_DIR/dummy.sh
 ls

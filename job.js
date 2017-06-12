@@ -6,7 +6,7 @@ var mkdirp = require('mkdirp');
 const util = require('util');
 const isStream = require('is-stream');
 var path = require("path");
- /* The jobObject behaves like an emitter storing process IDs, job  UUID, partition and status
+ /* The jobObject behaves like an emitter
      * Emitter exposes following event:
      *          'lostJob', {Object}jobObject : any job not found in the process pool
      *          'listError, {String}error) : the engine failed to list process along with error message
@@ -62,11 +62,11 @@ var batchDumper = function (job){
     var emitter = new events.EventEmitter();
     var batchContentString = "#!/bin/bash\n";
     var adress = job.emulated ? 'localhost' : job.adress;
-    var trailer = 'echo "JOB_STATUS ' + job.id + ' FINISHED"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n";
+    var trailer = 'echo -n "JOB_STATUS ' + job.id + ' FINISHED"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n";
 
     batchContentString += job.engineHeader; /// ENGINE SPECIFIC PREPROCESSOR LINES
 
-    batchContentString += 'echo "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n"
+    batchContentString += 'echo -n "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n"
 
     if (job.exportVar) {
         for (var key in job.exportVar) {

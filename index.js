@@ -283,11 +283,12 @@ module.exports = {
         var self = this;
         /* Define the new job parameters */
         // We now expect an inputs parameter which has to be a list
+        var workDir = cacheDir + '/' + jobID;
         var jobTemplate = {
             "debugMode" : debugMode,
             "id": jobID,
-            "engineHeader": engine.generateHeader(jobID, jobProfileString /*, jobOpt*/ ),
-            "rootDir": cacheDir,
+            "engineHeader": engine.generateHeader(jobID, jobProfileString, workDir),
+            "workDir": workDir,
             "emulated": emulator ? true : false,
             "adress": TCPip,
             "port": TCPport,

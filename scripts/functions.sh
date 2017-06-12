@@ -1,12 +1,13 @@
 #!/bin/bash
 
 function getSlavesIPs {
-    awk '$2 ~ /slave/ {print $2}' | sort | uniq
+    awk '$2 ~ /slave/ {print $1}' /etc/hosts | sort | uniq
 }
 
 function slaveDeploy {
     for ip in $1
         do
+        echo "ssh root@$ip \"yum -y install nc\""
         ssh root@$ip 'yum -y install nc'
     done
 }
@@ -18,11 +19,12 @@ function masterDeploy {
     curl -sL https://rpm.nodesource.com/setup_6.x | sudo -E bash -
     sudo yum -y install nodejs
     sudo yum -y install nc
-
 }
 
 
 function setManager {
+    echo setManager
+    return;
 
     export CLUSTER_QUEUELIST_CMD=`which qstat`
     export CLUSTER_QUEUESUB_CMD=`which qsub`

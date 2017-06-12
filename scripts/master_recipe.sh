@@ -1,25 +1,30 @@
 #!/bin/bash
-source functions.sh
+source ./functions.sh
 # LOG AS ifbuser
 # THEN sudo su
 # GUESS THE PULBIC IP ADRESS ON OPEN STACK CLOUD
 # curl http://169.254.169.254/latest/meta-data/public-ipv4
 
+MASTER_DEPLOY=""
+SLAVE_DEPLOY=""
+JMNG_DEPLOY=""
 
-while [[ $# -gt 1 ]]
+while [[ $# -gt 0 ]]
 do
 key="$1"
-
 case $key in
     #-e|--extension)
     #EXTENSION="$2"
     #shift # past argument
     #;;
     --master)
-    MASTER_DEPLOY=YES
+    MASTER_DEPLOY="YES"
     ;;
     --slave)
-    SLAVE_DEPLOY=YES
+    SLAVE_DEPLOY="YES"
+    ;;
+    --setup)
+    JMNG_DEPLOY="YES"
     ;;
     *)
             # unknown option
@@ -28,16 +33,18 @@ esac
 shift # past argument or value
 done
 
-[ test -z $MASTER_DEPLOY ] || masterDeploy
+[[ -z "$MASTER_DEPLOY" ]] || masterDeploy
 
-if ! test -z $SLAVE_DEPLOY;
+if ! test -z "$SLAVE_DEPLOY";
     then
-    ipAdr=getSlavesIPs
+    ipAdr=$(getSlavesIPs)
     slaveDeploy $ipAdr
 fi
 
-exit
 
+[[ -z "$JMNG_DEPLOY" ]] || setManager
+
+exit
 
 
 cat << EOF > $HOME_DIR/dummy.sh

@@ -147,7 +147,6 @@ var Job = function (opt) {
         console.dir(opt);
     }
     Core.call(this, opt);
-    this.batch = opt.batch;
     this.engineHeader = opt.engineHeader;
     this.submitBin = opt.submitBin;
     this.cmd = 'cmd' in opt ? opt.cmd : null; //the set of shell command to sbatch
@@ -157,8 +156,7 @@ var Job = function (opt) {
 
     this.port = opt.port;
     this.adress = opt.adress;
-    this.rootDir = opt.rootDir;
-    this.workDir = this.rootDir + '/' + this.id;
+    this.workDir = opt.workDir;
 
     this.cwd = 'cwd' in opt ? opt.cwd : null;
     this.cwdClone = 'cwdClone' in opt ? opt.cwdClone : false;

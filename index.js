@@ -5,7 +5,7 @@ var net = require('net');
 var jobLib = require('./job');
 var path = require('path');
 var clone = require('clone');
-
+var warehouse = require('./lib/warehouse');
 var sgeLib = require('./lib/sge');
 var slurmLib = require('./lib/slurm');
 var emulatorLib = require('./lib/emulator');
@@ -109,6 +109,8 @@ var _getCurrentJobList = function() {
     return jobObjList;
 }
 module.exports = {
+    index : warehouse.index,
+    getWorkDir : warehouse.getWorkDir,
     engine: function() {
         return engine;
     },
@@ -142,6 +144,9 @@ module.exports = {
      * TASK DIRECTORY CONVENTION :
      * The name of a task directory is composed of the task tag (exemple : "naccess")
      * with "Task_" and the unique id (uuid) and eventually a little string at the end (exemple : "_hex_25")
+     * indexation
+     * update indexation on jobSuccess
+     * getWorkDir(constraints) // contrainst on jobID.json, returns null or Array of workingdirecory
      */
 
     findTaskDir: function(tagTask) {
@@ -223,11 +228,11 @@ module.exports = {
      * @param  None
      * @return {Object}Litteral storing process IDs, job  UUID, partition and status
      */
-    queueReport: function() {
+ /*   queueReport: function() {
         return engine.queueReport;
     },
 
-
+*/
     /*
      * Check the existence of our jobs (present in jobsArray) in the engine processes list.
      * @param  None
@@ -296,7 +301,8 @@ module.exports = {
             "script": 'script' in jobOpt ? jobOpt.script : null,
             "cmd": 'cmd' in jobOpt ? jobOpt.cmd : null,
             "inputs": 'inputs' in jobOpt ? jobOpt.inputs : [],
-            "exportVar" : 'exportVar' in jobOpt ? jobOpt.exportVar : null
+            "exportVar" : 'exportVar' in jobOpt ? jobOpt.exportVar : null,
+            "tagTask": 'tagTask' in jobOpt ? jobOpt.tagTask : null
         };
         var newJob = jobLib.createJob(jobTemplate);
 
@@ -404,6 +410,7 @@ module.exports = {
 
     debugOn : function() {
         debugMode = true;
+        warehouse.debugOn();
     },
 
     set_id: function(val) {
@@ -448,6 +455,7 @@ function _pull(jid) { //handling job termination
     delete jobsArray[jid];
     var stdout = jRef.obj.stdout();
     var stderr = jRef.obj.stderr();
+    warehouse.store(jRef.obj);
     jRef.obj.emit("completed",
         stdout, stderr, jRef.obj
     );

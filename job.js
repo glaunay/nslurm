@@ -46,14 +46,9 @@ var _copyScript = function (job, fname/*, string*/, emitter) {
     src.pipe(wr);
 }
 
+
 var jobIdentityFileWriter = function (job) {
-    var serial = {};
-
-    if (job.cmd) serial['cmd'] = job.cmd;
-    if (job.script) serial['script'] = job.script;
-    if (job.exportVar) serial['exportVar'] = job.exportVar;
-    if (job.modules) serial['modules'] = job.modules;
-
+    var serial = job.getSerialIdentity();
     var json = JSON.stringify(serial);
     fs.writeFileSync(job.workDir + '/jobID.json', json, 'utf8');
 }
@@ -62,11 +57,11 @@ var batchDumper = function (job){
     var emitter = new events.EventEmitter();
     var batchContentString = "#!/bin/bash\n";
     var adress = job.emulated ? 'localhost' : job.adress;
-    var trailer = 'echo -n "JOB_STATUS ' + job.id + ' FINISHED"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n";
+    var trailer = 'echo "JOB_STATUS ' + job.id + ' FINISHED"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n";
 
     batchContentString += job.engineHeader; /// ENGINE SPECIFIC PREPROCESSOR LINES
 
-    batchContentString += 'echo -n "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n"
+    batchContentString += 'echo "JOB_STATUS ' + job.id + ' START"  | nc -w 2 ' + adress + ' ' + job.port + " > /dev/null\n"
 
     if (job.exportVar) {
         for (var key in job.exportVar) {
@@ -153,6 +148,7 @@ var Job = function (opt) {
     this.script = 'script' in opt ? opt.script : null; //the shell script to sbatch
     this.exportVar = 'exportVar' in opt ? opt.exportVar : null; //the shell script variable to export
     this.inputs = 'inputs' in opt ? opt.inputs : null; //the set inputs to copy in the $CWD/input folder
+    this.tagTask = 'tagTask' in opt ? opt.tagTask : null;
 
     this.port = opt.port;
     this.adress = opt.adress;
@@ -191,6 +187,18 @@ Job.prototype = Object.create(Core.prototype);
 Job.prototype.constructor = Job;
 
 /* Job Methods */
+
+Job.prototype.getSerialIdentity = function () {
+    var serial = {};
+
+    if (this.cmd) serial['cmd'] = this.cmd;
+    if (this.script) serial['script'] = this.script;
+    if (this.exportVar) serial['exportVar'] = this.exportVar;
+    if (this.modules) serial['modules'] = this.modules;
+    if (this.tagTask) serial['tagTask'] = this.tagTask;
+
+    return serial;
+}
 
 // Copy specified inputs in the jobDir input folder
 Job.prototype.setInput = function () {

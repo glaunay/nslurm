@@ -23,6 +23,12 @@ var scriptBatchTest = function() {
             console.log(content);
         });
 
+        if (indexTestBool) {
+            var testPath = jobManager.getWorkDir({ 'script' : './dummyJob/dummyJob.sh' });
+            console.log("Retrieve post--job work folders\n" + testPath);
+        }
+
+
         if(stderr) {
             var contentError = 'stderr content:\n';
             stderr.on('data', function(buf) { contentError += buf.toString(); });
@@ -53,6 +59,8 @@ var cmdBatchTest = function() {
 var cacheDir, port, tcp, engineType;
 var bean = {};
 var testFunc = null;
+var optCacheDir = [];
+var indexTestBool = false;
 process.argv.forEach(function (val, index, array){
     if (val === '--batch'){
         testFunc = scriptBatchTest;
@@ -62,6 +70,9 @@ process.argv.forEach(function (val, index, array){
     }
     if (val === '--cmd'){
         testFunc = cmdBatchTest;
+    }
+    if (val === '--index'){
+        indexTestBool = true;
     }
     if (val === '-p'){
         if (! array[index + 1])
@@ -93,11 +104,30 @@ process.argv.forEach(function (val, index, array){
         console.log("Config file content:\n");
         console.dir(bean);
     }
+    if (val === '-c'){
+        if (! array[index + 1])
+            throw("usage : ");
+        optCacheDir = array[index + 1].split(",");
+        console.log("Optional cacheDir content:\n");
+    }
 });
 
 port = port ? port : bean.port;
 tcp = tcp ? tcp : bean.tcp;
 engineType = engineType ? engineType : bean.engineType;
+
+
+if (indexTestBool) {
+    optCacheDir.push(bean.cacheDir);
+    jobManager.index(optCacheDir);
+    var testPath = jobManager.getWorkDir({ 'cmd' : null });
+    console.log("Retrieve job work folders\n" + testPath);
+    console.log("-------------------\n");
+    testPath = jobManager.getWorkDir({ 'script' : './dummyJob/dummyJob.sh' });
+    console.log("Retrieve job work folders\n" + testPath);
+}
+
+
 
 jobManager.configure({"engine" : engineType, "binaries" : bean.binaries });
 

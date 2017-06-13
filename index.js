@@ -405,6 +405,9 @@ module.exports = {
         var jobObjList = _getCurrentJobList();
         var emitter = engine.kill(jobObjList);
 
+        if (debugMode) warehouse.view();
+
+
         return emitter;
     },
 

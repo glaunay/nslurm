@@ -1,9 +1,7 @@
 {   "comments" : "template to test basic script submission functionality",
     "exportVar" : {
-        "inputFileOne" : "./input/input1.txt",
-        "inputFileTwo" : "./inputs_t/input2.txt",
         "dummyType" : "fabulous Fable"
     },
-    "inputs" : ["./dummyJob/input1.txt", "./dummyJob/input2.txt"],
+    "inputs" : {"fileInputSymbol" : "./dummyJob/input1.txt", "stringInputSymbol" : "EatMeDrinkMe"},
     "script" : "./dummyJob/dummyJob.sh"
 }

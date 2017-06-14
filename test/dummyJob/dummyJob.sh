@@ -1,5 +1,8 @@
 sleep 2
-cat $inputFileOne
+cat $fileInputSymbol
 echo "-----------"
-cat $inputFileTwo
+cat $streamInputSymbol
+echo "-----------"
+cat $stringInputSymbol
+cat 'YOTOT'
 sleep 2

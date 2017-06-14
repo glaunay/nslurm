@@ -1,5 +1,7 @@
 var jsonfile = require('jsonfile');
 var events = require('events');
+var Readable = require('stream').Readable;
+
 
 var jobManager = require('../index.js');
 
@@ -15,6 +17,11 @@ var scriptBatchTest = function() {
             "script" : template.script,
             "exportVar" : template.exportVar
         };
+    var s = new Readable();
+    s.push("This is a stream content test");
+    s.push(null);
+    jobOpt.inputs["streamInputSymbol"] = s;
+    console.log("Ok");
     var testJob = jobManager.push(bean.test.keyProfile, jobOpt);
     testJob.on("completed", function(stdout, stderr, jObj) {
         var content = '';

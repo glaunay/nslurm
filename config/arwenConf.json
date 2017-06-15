@@ -12,8 +12,7 @@
     "test": {
         "keyProfile": "arwen_express",
         "jobSettings": {
-            "cmd": "sleep 20;echo \"This is stdout of test job\"",
-            "inputs": []
+            "cmd": "sleep 20;echo \"This is stdout of test job\""
         }
     }
 }

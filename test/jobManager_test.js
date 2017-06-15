@@ -47,6 +47,7 @@ var scriptBatchTest = function() {
 }
 
 var cmdBatchTest = function(jobCount) {
+    console.log("Testing cmd batch " + jobCount + 'times');
     var jobArray = [];
     for (var i = 0; i < jobCount; i++) {
         var testJob = jobManager.push(bean.test.keyProfile, bean.test.jobSettings);
@@ -71,6 +72,7 @@ var bean = {};
 var testFunc = null;
 var optCacheDir = [];
 var indexTestBool = false;
+var listTestBool = false;
 var iJob = null;
 process.argv.forEach(function (val, index, array){
     if (val === '--batch'){
@@ -79,12 +81,17 @@ process.argv.forEach(function (val, index, array){
     if (val === '--dbg') {
         jobManager.debugOn();
     }
-    if (val === '-i'){
+    if (val === '-u'){
         if (! array[index + 1])
             throw("usage : ");
         iJob = array[index + 1];
-        indexTestBool = true;
         testFunc = cmdBatchTest;
+    }
+    if (val === '--index'){
+        indexTestBool = true;
+    }
+    if (val === '--list'){
+        listTestBool = true;
     }
     if (val === '-p'){
         if (! array[index + 1])
@@ -143,12 +150,13 @@ if (indexTestBool) {
 
 jobManager.configure({"engine" : engineType, "binaries" : bean.binaries });
 
-jobManager.engine().list()
-    .on('data', function(msg) {
-        console.log("Testing engine list function");
-        console.dir(msg);
-    });
-
+if (listTestBool) {
+    jobManager.engine().list()
+        .on('data', function(msg) {
+            console.log("Testing engine list function");
+            console.dir(msg);
+        });
+}
 jobManager.start({ 'cacheDir' : bean.cacheDir,
           'tcp' : tcp,
           'port' : port

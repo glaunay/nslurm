@@ -9,53 +9,51 @@ var path = require("path");
 var Readable = require('stream').Readable;
 
 
- /* The jobObject behaves like an emitter
-     * Emitter exposes following event:
-     *          'lostJob', {Object}jobObject : any job not found in the process pool
-     *          'listError, {String}error) : the engine failed to list process along with error message
-     *          'folderSetPermissionError', {String}msg, {String}err, {Object}job
-     *          'scriptSetPermissionError', {String}err, {Object}job;
-     *          'scriptWriteError', {String}err, {Object}job
-     *          'scriptReadError', {String}err, {Object}job
-     *          'inputError', {String}err, {Object}job
-     *          'ready'
-     *          'submitted', {Object}job;
-     *          'completed', {Stream}stdio, {Stream}stderr, {Object}job // this event raising is delegated to jobManager
-*/
+/* The jobObject behaves like an emitter
+ * Emitter exposes following event:
+ *          'lostJob', {Object}jobObject : any job not found in the process pool
+ *          'listError, {String}error) : the engine failed to list process along with error message
+ *          'folderSetPermissionError', {String}msg, {String}err, {Object}job
+ *          'scriptSetPermissionError', {String}err, {Object}job;
+ *          'scriptWriteError', {String}err, {Object}job
+ *          'scriptReadError', {String}err, {Object}job
+ *          'inputError', {String}err, {Object}job
+ *          'ready'
+ *          'submitted', {Object}job;
+ *          'completed', {Stream}stdio, {Stream}stderr, {Object}job // this event raising is delegated to jobManager
+ */
 
 
 
-
-
-var _copyScript = function (job, fname/*, string*/, emitter) {
+var _copyScript = function(job, fname /*, string*/ , emitter) {
 
     var src = fs.createReadStream(job.script);
     src.on("error", function(err) {
         job.emit('scriptReadError', err, job);
-        });
+    });
     var wr = fs.createWriteStream(fname);
     wr.on("error", function(err) {
         job.emit('scriptWriteError', err, job);
     });
     wr.on("close", function() {
-        fs.chmod(fname,'777', function(err){
-            if(err)
+        fs.chmod(fname, '777', function(err) {
+            if (err)
                 job.emit('scriptSetPermissionError', err, job);
             else
-                emitter.emit('scriptReady'/*, string*/);
+                emitter.emit('scriptReady' /*, string*/ );
         });
     });
     src.pipe(wr);
 }
 
 
-var jobIdentityFileWriter = function (job) {
+var jobIdentityFileWriter = function(job) {
     var serial = job.getSerialIdentity();
     var json = JSON.stringify(serial);
     fs.writeFileSync(job.workDir + '/jobID.json', json, 'utf8');
 }
 
-var batchDumper = function (job){
+var batchDumper = function(job) {
     var emitter = new events.EventEmitter();
     var batchContentString = "#!/bin/bash\n";
     var adress = job.emulated ? 'localhost' : job.adress;
@@ -78,7 +76,7 @@ var batchDumper = function (job){
     }
 
 
-    job.modules.forEach(function(e){
+    job.modules.forEach(function(e) {
         batchContentString += "module load " + e;
     });
 
@@ -86,22 +84,22 @@ var batchDumper = function (job){
         var fname = job.workDir + '/' + job.id + '_coreScript.sh';
         batchContentString += '. ' + fname + '\n' + trailer;
         _copyScript(job, fname, /*string,*/ emitter);
-       /* This should not be needed, as _copyScript emits the ready event in async block
-            setTimeout(function(){
-            emitter.emit('ready', string);
-        }, 5);
-        */
-    } else if(job.cmd) {
+        /* This should not be needed, as _copyScript emits the ready event in async block
+             setTimeout(function(){
+             emitter.emit('ready', string);
+         }, 5);
+         */
+    } else if (job.cmd) {
         batchContentString += job.cmd ? job.cmd : engine.testCommand;
         batchContentString += "\n" + trailer;
-        setTimeout(function(){
+        setTimeout(function() {
             emitter.emit('ready', batchContentString);
         }, 5);
     } else {
-        throw("You ask for a job but provided not command and script file");
+        throw ("You ask for a job but provided not command and script file");
     }
 
-    emitter.on('scriptReady', function(){
+    emitter.on('scriptReady', function() {
         emitter.emit('ready', batchContentString);
     })
     return emitter;
@@ -110,10 +108,10 @@ var batchDumper = function (job){
 
 /* Base Class, provide id generator and eventEmitter */
 var Core = function(opt) {
-    if (!opt) {
+    if (!opt)  {
         console.log("generating random id");
         this.id = uuid.v4();
-    } else if (! opt.hasOwnProperty('id')) {
+    } else if (!opt.hasOwnProperty('id')) {
         console.log("generating random id..");
         this.id = uuid.v4();
     } else if (!opt.id) {
@@ -127,7 +125,7 @@ var Core = function(opt) {
 
     this.emitter = new events.EventEmitter();
 }
-Core.prototype.say = function() {
+Core.prototype.say = function()  {
     console.log('hello');
 }
 
@@ -142,11 +140,11 @@ TODO
 
 
 /* Job constructor */
-var Job = function (opt) {
+var Job = function(opt) {
     if (!opt.hasOwnProperty('id')) {
         throw ("Job constructor must be provided an uuid");
     }
-    if(this.debugBool) {
+    if (this.debugBool) {
         console.log("JOB OPTION CONTENT\n");
         console.dir(opt);
     }
@@ -159,7 +157,7 @@ var Job = function (opt) {
     this.inputs = 'inputs' in opt ? opt.inputs : null; //the set inputs to copy in the $CWD/input folder
     this.tagTask = 'tagTask' in opt ? opt.tagTask : null;
 
-    this.emulated = 'emulated' in opt ? opt.emulated ? true : false :false;
+    this.emulated = 'emulated' in opt ? opt.emulated ? true : false : false;
 
     this.port = opt.port;
     this.adress = opt.adress;
@@ -174,25 +172,26 @@ var Job = function (opt) {
     this.debugBool = 'debugMode' in opt ? opt.debugMode : false;
     this.inputSymbols = {};
 
-
     var self = this;
-    mkdirp(this.workDir+ "/input", function (err) {
+    mkdirp(this.workDir + "/input", function(err) {
         if (err) {
             var msg = 'failed to create job ' + self.id + ' directory, ' + err;
             self.emit('folderCreationError', msg, err, job);
             return;
         }
-        fs.chmod(self.workDir,'777', function(err){
+        fs.chmod(self.workDir, '777', function(err) {
             if (err) {
                 var msg = 'failed to change perm job ' + self.id + ' directory, ' + err;
                 self.emit('folderSetPermissionError', msg, err, job);
                 return;
             }
             self.emit('workspaceCreated');
-            self.setInput();
+
             self.on('inputSet', function() {
-                console.log("Lets go!");
-                self.setUp();});
+                self.setUp();
+            });
+            self.setInput(); //ASYNC or SYNC, Hence the call after the callback binding
+
         });
     });
 
@@ -203,7 +202,7 @@ Job.prototype.constructor = Job;
 
 /* Job Methods */
 
-Job.prototype.getSerialIdentity = function () {
+Job.prototype.getSerialIdentity = function() {
     var serial = {};
 
     if (this.cmd) serial['cmd'] = this.cmd;
@@ -236,65 +235,70 @@ where key are SYMBOL which will be used in two ways
 
 
 Job.prototype.setInput = function() {
-    var self = this;
-    if (!this.inputs) {
-        self.emit("inputSet");
-        return;
-    }
-    var totalSet = Object.keys(self.inputs).length;
-    if (totalSet == 0) {
-        self.emit("inputSet");
-        return;
-    }
+        var self = this;
 
-    var nSet = 0;
 
-    function ringBellAllSet(k, v) {
-        if (nSet === totalSet)
+// Following two conditions are not async
+        if (!this.inputs) {
             self.emit("inputSet");
-    };
+            return;
+        }
+        var totalSet = Object.keys(self.inputs).length;
+        if (totalSet == 0) {
+            self.emit("inputSet");
+            return;
+        }
 
-    var stream = null;
 
-    for (var symbol in this.inputs) {
-        var inputValue = this.inputs[symbol];
-        var dumpFile = self.workDir + '/input/' + symbol + '.inp';
-        self.inputSymbols[symbol] = dumpFile;
-//        console.log(inputValue + '==>' + dumpFile);
 
-        if (util.isString(inputValue)) { // Input is a string
-            if (fs.existsSync(inputValue)) { // Input is a path to file, create a stream from its content
-                stream = fs.createReadStream(inputValue)
-            } else { // A simple string to wrap in a stream
-                stream = new Readable();
-                stream.push(inputValue);
-                stream.push(null);
+        var nSet = 0;
+
+        function ringBellAllSet(k, v) {
+            if (nSet === totalSet)
+                self.emit("inputSet");
+        };
+
+        var stream = null;
+
+        for (var symbol in this.inputs) {
+            var inputValue = this.inputs[symbol];
+            var dumpFile = self.workDir + '/input/' + symbol + '.inp';
+            self.inputSymbols[symbol] = dumpFile;
+            //        console.log(inputValue + '==>' + dumpFile);
+
+            if (util.isString(inputValue)) { // Input is a string
+                if (fs.existsSync(inputValue)) { // Input is a path to file, create a stream from its content
+                    stream = fs.createReadStream(inputValue)
+                } else { // A simple string to wrap in a stream
+                    stream = new Readable();
+                    stream.push(inputValue);
+                    stream.push(null);
+                }
+            } else if (isStream(inputValue)) { // Input value is already a stream
+                stream = inputValue;
             }
-        } else if (isStream(inputValue)) { // Input value is already a stream
-            stream = inputValue;
-        }
 
-        if (stream === null) {
-            var msg = "Supplied input \"" + inputValue + "\" could not be guessed";
-            self.emit('inputError', msg, self);
-        }
+            if (stream === null) {
+                var msg = "Supplied input \"" + inputValue + "\" could not be guessed";
+                self.emit('inputError', msg, self);
+            }
 
-        stream.pipe(fs.createWriteStream(dumpFile))
-        .on('finish', function() {
-            nSet++;
-            ringBellAllSet();
-        });
+            stream.pipe(fs.createWriteStream(dumpFile))
+                .on('finish', function() {
+                    nSet++;
+                    ringBellAllSet();
+                });
+        }
     }
-}
-// Process argument to create the string which will be dumped to an sbatch file
-Job.prototype.setUp = function() {
+    // Process argument to create the string which will be dumped to an sbatch file
+Job.prototype.setUp = function()  {
     var self = this;
     var customCmd = false;
-    batchDumper(this).on('ready', function (string){
+    batchDumper(this).on('ready', function(string) {
         var fname = self.workDir + '/' + self.id + '.batch';
         //if (self.emulated) fname = self.workDir + '/' + self.id + '.sh';
         fs.writeFile(fname, string, function(err) {
-            if(err) {
+            if (err) {
                 return console.log(err);
             }
             jobIdentityFileWriter(self);
@@ -308,7 +312,7 @@ Job.prototype.setUp = function() {
 }
 
 // Submit to slurm
-Job.prototype.submit = function(fname) {
+Job.prototype.submit = function(fname)  {
     var self = this;
     // do submission, raise submit 'event'
     // shell command
@@ -327,19 +331,22 @@ Job.prototype.submit = function(fname) {
         console.log('workdir : >' + this.workDir + '<');
     }
 
-    var process = spawn(this.submitBin, submitArgArray, { 'cwd' : this.workDir });
-    process.on('exit', function () {
+    var process = spawn(this.submitBin, submitArgArray, {
+        'cwd': this.workDir
+    });
+    process.on('exit', function() {
         self.emit('submitted', self);
     });
 }
 
 Job.prototype.fork = function(fname) {
     var submitArgArray = [fname];
-    if(this.debugBool)
+    if (this.debugBool)
         console.log('local [' + this.workDir + '] forking w/ sh ' + submitArgArray);
-    var process = spawn('sh', submitArgArray,
-                 { 'cwd' : this.workDir });
-    if(this.emulated) {
+    var process = spawn('sh', submitArgArray, {
+        'cwd': this.workDir
+    });
+    if (this.emulated) {
         this.stdio = process.stdout;
         this._stderr = process.stderr;
     }
@@ -347,20 +354,20 @@ Job.prototype.fork = function(fname) {
 }
 
 
-Job.prototype.live = function() {
+Job.prototype.live = function()  {
     var self = this
-    this.ttlMark = setTimeout(function(){
+    this.ttlMark = setTimeout(function() {
         self.emit('timeOut');
     }, self.ttl);
 }
 
-Job.prototype.on = function(event, callback) {
+Job.prototype.on = function(event, callback)  {
     this.emitter.on(event, callback);
 }
 
-Job.prototype.emit = function(){
+Job.prototype.emit = function() {
     var argArray = [];
-    for(var i = 0; i < arguments.length; i++) { 
+    for (var i = 0; i < arguments.length; i++) { 
         argArray.push(arguments[i]);
     }
     this.emitter.emit.apply(this.emitter, argArray);
@@ -369,20 +376,20 @@ Job.prototype.emit = function(){
 Job.prototype.stdout = function() {
     if (this.emulated) return this.stdio;
     var fNameStdout = this.hasOwnProperty('out') ? this.out : this.id + ".out";
-    var fPath = this.workDir +'/' + fNameStdout;
+    var fPath = this.workDir + '/' + fNameStdout;
 
-    if (! fs.existsSync(fPath)) {
-        if(this.debugBool) {
+    if (!fs.existsSync(fPath)) {
+        if (this.debugBool) {
             console.log("cant find file " + fPath);
             console.log("forcing synchronicity...");
         }
-        fs.readdirSync(this.workDir).forEach(function(fn){
-            if(this.debugBool)
+        fs.readdirSync(this.workDir).forEach(function(fn) {
+            if (this.debugBool)
                 console.log("ddirSync : " + fn);
         });
     }
     if (!fs.existsSync(fPath)) {
-        if(this.debugBool)
+        if (this.debugBool)
             console.log("Output file error, Still cant open output file, returning empy stream");
         var Readable = require('stream').Readable;
         var dummyStream = new Readable();
@@ -390,14 +397,16 @@ Job.prototype.stdout = function() {
         return dummyStream;
     }
 
-    var stream = fs.createReadStream(fPath,  {'encoding' : 'utf8'})
-    .on('error', function(m){
-        var d = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '')
-        if(this.debugBool) {
-            console.log("[" + d + "] An error occured while creating read stream " + fPath);
-            console.log(m);
-        }
-    });
+    var stream = fs.createReadStream(fPath, {
+            'encoding': 'utf8'
+        })
+        .on('error', function(m) {
+            var d = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '')
+            if (this.debugBool) {
+                console.log("[" + d + "] An error occured while creating read stream " + fPath);
+                console.log(m);
+            }
+        });
     //stream.on("open", function(){ console.log("stdout stream opened");});
     //stream.on("end", function(){console.log('this is stdout END');});
     return stream;
@@ -408,18 +417,18 @@ Job.prototype.stderr = function() {
     var statErr;
     var bErr = true;
     try { 
-        statErr = fs.statSync(this.workDir +'/' + fNameStderr);
-    } catch(err) {
+        statErr = fs.statSync(this.workDir + '/' + fNameStderr);
+    } catch (err) {
         bErr = false;
     }
-    if(!bErr) return null;
-    if(statErr.size === 0) return null;
+    if (!bErr) return null;
+    if (statErr.size === 0) return null;
 
-    var stream = fs.createReadStream(this.workDir +'/' + fNameStderr);
+    var stream = fs.createReadStream(this.workDir + '/' + fNameStderr);
     return stream;
 }
 module.exports = {
-    createJob : function(opt){
+    createJob: function(opt) {
         j = new Job(opt);
         return j;
     }

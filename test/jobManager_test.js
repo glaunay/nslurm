@@ -46,18 +46,21 @@ var scriptBatchTest = function() {
     });
 }
 
-var cmdBatchTest = function() {
-    var testJob = jobManager.push(bean.test.keyProfile, bean.test.jobSettings);
-    var testJob2 = jobManager.push(bean.test.keyProfile, bean.test.jobSettings);
-    var testJob3 = jobManager.push(bean.test.keyProfile, bean.test.jobSettings);
-
-    testJob.on("completed", function(stdout, stderr, jObj) {
-        var content = '';
-        stdout.on('data', function(buf) { content += buf.toString(); });
-        stdout.on('end', function() {
-            console.log(content);
+var cmdBatchTest = function(jobCount) {
+    var jobArray = [];
+    for (var i = 0; i < jobCount; i++) {
+        var testJob = jobManager.push(bean.test.keyProfile, bean.test.jobSettings);
+        jobArray.push(testJob);
+        jobArray[jobArray.length - 1].on("completed", function(stdout, stderr, jObj) {
+            var content = '';
+            stdout.on('data', function(buf) {
+                content += buf.toString();
+            });
+            stdout.on('end', function() {
+                console.log(content);
+            });
         });
-    });
+    }
 }
 
 
@@ -68,6 +71,7 @@ var bean = {};
 var testFunc = null;
 var optCacheDir = [];
 var indexTestBool = false;
+var iJob = null;
 process.argv.forEach(function (val, index, array){
     if (val === '--batch'){
         testFunc = scriptBatchTest;
@@ -75,11 +79,12 @@ process.argv.forEach(function (val, index, array){
     if (val === '--dbg') {
         jobManager.debugOn();
     }
-    if (val === '--cmd'){
-        testFunc = cmdBatchTest;
-    }
-    if (val === '--index'){
+    if (val === '-i'){
+        if (! array[index + 1])
+            throw("usage : ");
+        iJob = array[index + 1];
         indexTestBool = true;
+        testFunc = cmdBatchTest;
     }
     if (val === '-p'){
         if (! array[index + 1])
@@ -153,7 +158,7 @@ jobManager.on('exhausted', function(){
     });
 
 if(testFunc) {
-    jobManager.on('ready', testFunc);
+    jobManager.on('ready', function() {testFunc(iJob);});
 } else {
     console.log("No supplied submission test, exiting");
     process.exit(0);

@@ -9,6 +9,9 @@ var warehouse = require('./lib/warehouse');
 var sgeLib = require('./lib/sge');
 var slurmLib = require('./lib/slurm');
 var emulatorLib = require('./lib/emulator');
+var async = require('async');
+var deepEqual = require('deep-equal');
+
 var engine = null;
 
 var TCPport = 2222;
@@ -260,6 +263,8 @@ module.exports = {
                         console.log('Job "' + key + '" found BACK ! Jokers count restored');
 
                     curr_job.obj.MIA_jokers = 3;
+                    curr_job.nCycle += 1;
+                    ttlTest(curr_job);
                 }
             }
             //emitter.emit('');
@@ -298,35 +303,62 @@ module.exports = {
             "adress": TCPip,
             "port": TCPport,
             "submitBin": engine.submitBin(),
+            "ttl": 'ttl' in jobOpt ? jobOpt.ttl : null,
             "script": 'script' in jobOpt ? jobOpt.script : null,
             "cmd": 'cmd' in jobOpt ? jobOpt.cmd : null,
             "inputs": 'inputs' in jobOpt ? jobOpt.inputs : [],
             "exportVar" : 'exportVar' in jobOpt ? jobOpt.exportVar : null,
             "tagTask": 'tagTask' in jobOpt ? jobOpt.tagTask : null
         };
+
+
         var newJob = jobLib.createJob(jobTemplate);
+        /*
+        lookup(jobTemplate).on('known', function() {
+                //newJob.resurrec
+            })
+            .on('unknown', function() {
+                newJob.start();
 
-        jobsArray[jobID] = {
-            'obj': newJob,
-            'status': 'CREATED'
-        };
-        if(debugMode)
-            self.jobsView();
+                jobsArray[jobID] = {
+                    'obj': newJob,
+                    'status': 'CREATED',
+                    'nCycle': 0
+                };
+                if (debugMode)
+                    self.jobsView();
 
-        newJob.emitter.on('submitted', function(j) {
-            //console.log(j);
-            jobsArray[j.id].status = 'SUBMITTED';
-            if(debugMode)
-                self.jobsView();
-        }).on('jobStart', function(job) {
-            // next lines for tests on squeueReport() :
-            engine.list()
-        })
+                newJob.emitter.on('submitted', function(j) {
+                    //console.log(j);
+                    jobsArray[j.id].status = 'SUBMITTED';
+                    if (debugMode)
+                        self.jobsView();
+                }).on('jobStart', function(job) {
+                    // next lines for tests on squeueReport() :
+                    engine.list()
+                })
+
+            })
+        */
+
+          jobsArray[jobID] = {
+                    'obj': newJob,
+                    'status': 'CREATED',
+                    'nCycle': 0
+                };
+
+
+        newJob.start();
+
 
         exhaustBool = true;
         //console.log(jobsArray);
 
-        return newJob.emitter;
+        return newJob;
+
+        //return jobsArray[jobID]
+
+        //return newJob.emitter;
     },
     /**
      * Starts the job manager
@@ -350,7 +382,7 @@ module.exports = {
         TCPip = opt.tcp;
         TCPport = opt.port;
         jobProfiles = opt.jobProfiles;
-
+        cycleLength = opt.cycleLength ? parseInt(opt.cycleLength) : 5000;
         if (opt.hasOwnProperty('forceCache')) {
             cacheDir = opt.forceCache;
         }
@@ -381,7 +413,7 @@ module.exports = {
                 }, 500);
                 warden = setInterval(function() {
                     self.jobWarden()
-                }, 5000);
+                }, cycleLength);
 
                 console.log("       --->jobManager " + scheduler_id + " ready to process jobs<---\n\n");
                 eventEmitter.emit("ready");
@@ -425,6 +457,23 @@ module.exports = {
 
 };
 
+
+function ttlTest(curr_job) {
+    if (!curr_job.obj.ttl) return;
+
+    var jid = curr_job.obj.id;
+    var elaspedTime = cycleLength * curr_job.nCycle;
+    console.log("Job is running for ~ " + elaspedTime + "ms [ttl is : " +  curr_job.obj.ttl  + "]");
+    if(elaspedTime > curr_job.obj.ttl) {
+        console.log("TTL exceeded for Job " + jid + ", terminating it");
+        engine.kill([curr_job.obj]).on('cleanExit', function(){
+            if(jid in jobsArray)
+                delete jobsArray[jid];
+        }); // Emiter is passed here if needed
+    }
+}
+
+
 function _parseMessage(string) {
     //console.log("trying to parse " + string);
     var re = /^JOB_STATUS[\s]+([\S]+)[\s]+([\S]+)/
@@ -450,20 +499,137 @@ function _parseMessage(string) {
         _pull(jid);
 };
 
-function _pull(jid) { //handling job termination
+
+/*
+    handling job termination.
+    Eventualluy resubmit job if error found
+
+*/
+
+function _pull(jid) {
     if(debugMode)
         console.log("Pulling " + jid);
-    //console.dir(jobsArray[jid]);
     var jRef = jobsArray[jid];
-    delete jobsArray[jid];
-    var stdout = jRef.obj.stdout();
-    var stderr = jRef.obj.stderr();
-    warehouse.store(jRef.obj);
-    jRef.obj.emit("completed",
-        stdout, stderr, jRef.obj
-    );
+    //console.dir(jobsArray[jid]);
+
+    if(jRef.obj.stderr()) {
+        var stderrString = null;
+        jRef.obj.stderr().on('data', function (datum) {
+            stderrString = stderrString ? stderrString + datum.toString() : datum.toString();
+        })
+        .on('end', function () {
+            if(!stderrString) { _storeAndEmit(jid); return; }
+
+            console.log("Job " + jid + " delivered a non empty stderr stream \"" + stderrString + "\"");
+            jRef.obj.ERR_jokers--;
+            if (jRef.obj.ERR_jokers > 0){
+                console.log("Resubmitting this job " + jRef.obj.ERR_jokers + " try left");
+                jRef.obj.resubmit();
+                jRef.nCycle = 0;
+            } else {
+                console.log("This job will be set in error state");
+                _storeAndEmit(jid, 'error');
+            }
+        });
+    } else {
+    // At this point we store and unreference the job and emit as completed
+        _storeAndEmit(jid);
+    }
 };
 
+/*
+ We  treat error state emission / document it for calling scope
+*/
+function _storeAndEmit(jid, status) {
+    var jRef = jobsArray[jid];
+
+    var jobObj = jRef.obj;
+    delete jobsArray[jid];
+    var stdout = jobObj.stdout();
+    var stderr = jobObj.stderr();
+    /*force emulated to dump stdout/err*/
+    if (jobObj.emulated) {
+        async.parallel([function(callback) {
+                        var fOut = jobObj.workDir + '/' + jobObj.id + '.err';
+                        var errStream = fs.createWriteStream(fOut);
+                        stderr.pipe(errStream).on('close', function() {
+                            callback(null, fOut);
+                        });
+                    }, function(callback) {
+                        var fOut = jobObj.workDir + '/' + jobObj.id + '.out';
+                        var outStream = fs.createWriteStream(fOut);
+                        stdout.pipe(outStream).on('close', function() {
+                            callback(null, fOut);
+                        });
+                    }], // Once all stream have been consumed, get filesnames
+                    function(err,results) {
+                        var _stdout = fs.createReadStream(results[1]);
+                        var _stderr = fs.createReadStream(results[0]);
+                         jobObj.emit("completed", _stdout, _stderr, jobObj);
+                    });
+    } else {
+        if(!status) {
+            warehouse.store(jobObj);
+            jobObj.emit("completed",
+                stdout, stderr, jobObj
+            );
+        } else {
+            jobObj.emit("jobError",
+                stdout, stderr, jobObj
+            );
+        }
+    }
+}
+
+/*
+    getWorkDir of all but inputs constraints.
+    browse the workingDir list
+    parse key and filenames from input subfolders
+    store pairs in a litteral
+    Apply job.inputMapper to litteral
+    perform deepEqual comp between
+    job.inputMapper(jobOpt.inputs) and aforementioned litteral
+*/
+/*
+var lookup = function(jobOpt) {
+    var emiter = new events.EventEmitter();
+    */
+    /* The only constraints taken into account by warehouse */
+/*    var constraints = {
+        'exportVar' : null
+        //'cmd' : jobOpt.cmd,
+        //'script' : jobOpt.script,
+        //'exportVar' : jobOpt.exportVar,
+       // 'modules' : jobOpt.modules,
+        //'tagTask' : jobOpt.tagTask
+    };
+    jobLib.inputsMapper(jobOpt.inputs).on('mapped', function(refLitteral) {
+
+        async.filter(warehouse.getWorkDir(constraints), function(workFolder, callback) {
+            jobLib.inputMapper(inputFileToLitteral(workFolder)).on('mapped', function(currLitteral){
+                if(!deepEqual(refLitteral, currLitteral))  callback(null, false);
+
+
+        },
+        function(err, results) {
+            emiter.emit('known')
+        }
+        );
+
+    });
+    return emiter;
+}
+*/
+var inputFileToLitteral = function (folderPath) {
+    console.log("<>" + folderPath);
+    var litt = {}
+    fs.readdirSync(folderPath + '/input').map(function(file){
+        file = folderPath+ '/input/' + file;
+        litt[path.basename(file, '.inp')] = file;
+    });
+
+    return litt;
+}
 
 function _openSocket(port) {
     var eventEmitterSocket = new events.EventEmitter();

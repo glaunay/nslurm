@@ -24,6 +24,47 @@ var Readable = require('stream').Readable;
  */
 
 
+var inputsMapper = function (inputLitt) {
+    var newLitt = {};
+
+    var nTotal = Object.keys(inputLitt).length;
+
+    var emitter = new events.EventEmitter();
+
+    function spit(inputValue, symbol) {
+        var stream = null;
+        if (util.isString(inputValue)) { // Input is a string
+            if (fs.existsSync(inputValue)) { // Input is a path to file, create a stream from its content
+                stream = fs.createReadStream(inputValue)
+            } else { // A simple string to wrap in a stream
+                stream = new Readable();
+                stream.push(inputValue);
+                stream.push(null);
+            }
+        } else if (isStream(inputValue)) { // Input value is already a stream
+            stream = inputValue;
+        }
+
+        stream.on('data',function(d){
+            newLitt[symbol] += d.toString();
+        })
+        .on('end', function(){
+            nTotal--;
+            if(nTotal == 0) emitter.emit('mapped', newLitt);
+        });
+
+    };
+
+    for (var symbol in inputLitt) {
+        newLitt[symbol] = '';
+        var inputValue = inputLitt[symbol];
+        spit(inputValue, symbol);
+    }
+    //return inputLitt
+    return emitter;
+}
+
+
 
 var _copyScript = function(job, fname /*, string*/ , emitter) {
 
@@ -165,13 +206,18 @@ var Job = function(opt) {
 
     this.cwd = 'cwd' in opt ? opt.cwd : null;
     this.cwdClone = 'cwdClone' in opt ? opt.cwdClone : false;
-
+    this.ttl = 'ttl' in opt ? opt.ttl : null;
+    this.ERR_jokers = 3; //  Number of time a job is allowed to be resubmitted if its stderr is non null
     this.MIA_jokers = 3; //  Number of time a job is allowed to not be found in the squeue
     this.modules = 'modules' in opt ? opt.modules : []; //the set of module to load
 
     this.debugBool = 'debugMode' in opt ? opt.debugMode : false;
     this.inputSymbols = {};
+};
+Job.prototype = Object.create(Core.prototype);
+Job.prototype.constructor = Job;
 
+Job.prototype.start = function () {
     var self = this;
     mkdirp(this.workDir + "/input", function(err) {
         if (err) {
@@ -197,10 +243,11 @@ var Job = function(opt) {
 
 };
 
-Job.prototype = Object.create(Core.prototype);
-Job.prototype.constructor = Job;
 
-/* Job Methods */
+
+/*
+ This method returns a litteral which "uniquely defines" the job Object
+*/
 
 Job.prototype.getSerialIdentity = function() {
     var serial = {};
@@ -235,61 +282,35 @@ where key are SYMBOL which will be used in two ways
 
 
 Job.prototype.setInput = function() {
-        var self = this;
+    var self = this;
 
 
-// Following two conditions are not async
-        if (!this.inputs) {
-            self.emit("inputSet");
-            return;
-        }
-        var totalSet = Object.keys(self.inputs).length;
-        if (totalSet == 0) {
-            self.emit("inputSet");
-            return;
-        }
-
-
-
-        var nSet = 0;
-
-        function ringBellAllSet(k, v) {
-            if (nSet === totalSet)
-                self.emit("inputSet");
-        };
-
-        var stream = null;
-
-        for (var symbol in this.inputs) {
-            var inputValue = this.inputs[symbol];
-            var dumpFile = self.workDir + '/input/' + symbol + '.inp';
-            self.inputSymbols[symbol] = dumpFile;
-            //        console.log(inputValue + '==>' + dumpFile);
-
-            if (util.isString(inputValue)) { // Input is a string
-                if (fs.existsSync(inputValue)) { // Input is a path to file, create a stream from its content
-                    stream = fs.createReadStream(inputValue)
-                } else { // A simple string to wrap in a stream
-                    stream = new Readable();
-                    stream.push(inputValue);
-                    stream.push(null);
-                }
-            } else if (isStream(inputValue)) { // Input value is already a stream
-                stream = inputValue;
-            }
-
-            if (stream === null) {
-                var msg = "Supplied input \"" + inputValue + "\" could not be guessed";
-                self.emit('inputError', msg, self);
-            }
-
-            stream.pipe(fs.createWriteStream(dumpFile))
-                .on('finish', function() {
-                    nSet++;
-                    ringBellAllSet();
-                });
-        }
+    // Following two conditions are not async
+    if (!this.inputs) {
+        self.emit("inputSet");
+        return;
     }
+
+    var totalSet = Object.keys(self.inputs).length;
+    if (totalSet == 0) {
+        self.emit("inputSet");
+        return;
+    }
+
+    var stream = null;
+    inputsMapper(this.inputs).on('mapped', function(inputsAsStringLitt) {
+        console.log(inputsAsStringLitt);
+        var nTotal = Object.keys(inputsAsStringLitt).length;
+        for (var symbol in inputsAsStringLitt) {
+            var fileContent = inputsAsStringLitt[symbol];
+            var dumpFile = self.workDir + '/input/' + symbol + '.inp';
+            fs.writeFileSync(dumpFile, fileContent);
+            self.inputSymbols[symbol] = dumpFile;
+        }
+        self.emit("inputSet");
+    });
+    return;
+}
     // Process argument to create the string which will be dumped to an sbatch file
 Job.prototype.setUp = function()  {
     var self = this;
@@ -309,6 +330,15 @@ Job.prototype.setUp = function()  {
                 self.submit(fname);
         });
     });
+}
+
+Job.prototype.resubmit = function()  {
+    var fname = this.workDir + '/' + this.id + '.batch';
+    if (this.emulated)
+        this.fork(fname);
+    else
+        this.submit(fname);
+
 }
 
 // Submit to slurm
@@ -412,7 +442,7 @@ Job.prototype.stdout = function() {
     return stream;
 }
 Job.prototype.stderr = function() {
-    if (this.emulated) return this._stderr;
+    if (this.emulated){return this._stderr;}
     var fNameStderr = this.hasOwnProperty('err') ? this.err : this.id + ".err";
     var statErr;
     var bErr = true;
@@ -431,5 +461,6 @@ module.exports = {
     createJob: function(opt) {
         j = new Job(opt);
         return j;
-    }
+    },
+    inputMapper : inputsMapper
 };

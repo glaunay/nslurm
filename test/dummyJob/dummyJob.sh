@@ -4,5 +4,5 @@ echo "-----------"
 cat $streamInputSymbol
 echo "-----------"
 cat $stringInputSymbol
-cat 'YOTOT'
+#cat 'YOTOT'
 sleep 2

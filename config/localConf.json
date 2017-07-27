@@ -12,8 +12,9 @@
     "test": {
         "keyProfile": null,
         "jobSettings": {
-            "cmd": "sleep 20;echo \"This is stdout of test job\"",
-            "inputs": []
+            "cmd": "sleep 10;value=`awk -v min=1 -v max=2 'BEGIN{srand(); print int(min+rand()*(max-min+1))}'`; if [ $value -eq 1 ];then echo \"$value, this should generate error\";(>&2 echo \"This is stderr of test job ($value)\"); else echo \"This is safe stdout of test job ($value)\";fi",
+            "inputs": [],
+            "ttl" : 15000
         }
     }
 }

@@ -10,21 +10,26 @@ var parseConfig = function (fileName){
     return obj;
 };
 
-var scriptBatchTest = function() {
+var scriptBatchTest = function(opt) {
     var template = require("./dummyJob/dummyJob.json");
     var jobOpt = {
             "inputs" : template.inputs,
             "script" : template.script,
             "exportVar" : template.exportVar
-        };
+    };
+
+    for (var key in opt) {
+        console.log("option \"" + key + "\"will override \"dummyJob.json\" jobSettings, new value is  " +  opt[key]);
+        jobOpt[key] = opt[key];
+    }
+
     var s = new Readable();
     s.push("This is a stream content test");
     s.push(null);
     jobOpt.inputs["streamInputSymbol"] = s;
-    console.log("Ok");
     var testJob = jobManager.push(bean.test.keyProfile, jobOpt);
     testJob.on("completed", function(stdout, stderr, jObj) {
-        var content = '';
+        var content = 'stdout content:\n';
         stdout.on('data', function(buf) { content += buf.toString(); });
         stdout.on('end', function() {
             console.log(content);
@@ -46,11 +51,18 @@ var scriptBatchTest = function() {
     });
 }
 
-var cmdBatchTest = function(jobCount) {
+var cmdBatchTest = function(opt, jobCount) {
     console.log("Testing cmd batch " + jobCount + 'times');
+
+    var jobOpt = bean.test.jobSettings;
+    for (var key in opt) {
+        console.log("option \"" + key + "\" will override \"test\" jobSettings, new value is  " +  opt[key]);
+        jobOpt[key] = opt[key];
+    }
+
     var jobArray = [];
     for (var i = 0; i < jobCount; i++) {
-        var testJob = jobManager.push(bean.test.keyProfile, bean.test.jobSettings);
+        var testJob = jobManager.push(bean.test.keyProfile, jobOpt);
         jobArray.push(testJob);
         jobArray[jobArray.length - 1].on("completed", function(stdout, stderr, jObj) {
             var content = '';
@@ -74,6 +86,7 @@ var optCacheDir = [];
 var indexTestBool = false;
 var listTestBool = false;
 var iJob = null;
+var ttl = null;
 process.argv.forEach(function (val, index, array){
     if (val === '--batch'){
         testFunc = scriptBatchTest;
@@ -129,6 +142,11 @@ process.argv.forEach(function (val, index, array){
         optCacheDir = array[index + 1].split(",");
         console.log("Optional cacheDir content:\n");
     }
+    if (val === '-t'){
+        if (! array[index + 1])
+            throw("usage : ");
+        ttl = array[index + 1];
+    }
 });
 
 port = port ? port : bean.port;
@@ -165,12 +183,25 @@ jobManager.on('exhausted', function(){
         console.log("All jobs processed");
     });
 
+// Overriding default job options
+var jobOpt = {}
+if (ttl) jobOpt.ttl = ttl;
+
 if(testFunc) {
-    jobManager.on('ready', function() {testFunc(iJob);});
+    jobManager.on('ready', function() {testFunc(jobOpt, iJob);});
 } else {
     console.log("No supplied submission test, exiting");
     process.exit(0);
 }
+
+
+
+
+
+
+
+
+
 // if stopping the process using Ctrl + C
 process.on('SIGINT', function () {
     console.log(' Try to close the jobManager processes...');

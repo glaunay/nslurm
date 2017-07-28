@@ -1,5 +1,5 @@
 var fs = require('fs'); // file system
-var uuid = require('node-uuid');
+const uuid = require('uuid/v4');
 var events = require('events');
 var net = require('net');
 var jobLib = require('./job');
@@ -16,7 +16,7 @@ var engine = null;
 
 var TCPport = 2222;
 var TCPip = null;
-var scheduler_id = uuid.v4();
+var scheduler_id = uuid();
 var dataLength = 0;
 var id = '00000'
 var core = null;
@@ -95,7 +95,7 @@ var _checkBinariesSpecs = function(opt) {
  * @return {String}UUID
  */
 var drawJobNumber = function() {
-    return uuid.v4();
+    return uuid();
 }
 
 /**
@@ -313,11 +313,12 @@ module.exports = {
 
 
         var newJob = jobLib.createJob(jobTemplate);
-        /*
+
         lookup(jobTemplate).on('known', function() {
-                //newJob.resurrec
+                console.log("I CAN RESURRECT YOU");
             })
             .on('unknown', function() {
+                console.log("gogo");
                 newJob.start();
 
                 jobsArray[jobID] = {
@@ -339,8 +340,8 @@ module.exports = {
                 })
 
             })
-        */
 
+/*
           jobsArray[jobID] = {
                     'obj': newJob,
                     'status': 'CREATED',
@@ -349,7 +350,7 @@ module.exports = {
 
 
         newJob.start();
-
+*/
 
         exhaustBool = true;
         //console.log(jobsArray);
@@ -590,12 +591,11 @@ function _storeAndEmit(jid, status) {
     perform deepEqual comp between
     job.inputMapper(jobOpt.inputs) and aforementioned litteral
 */
-/*
+
 var lookup = function(jobOpt) {
     var emiter = new events.EventEmitter();
-    */
     /* The only constraints taken into account by warehouse */
-/*    var constraints = {
+    var constraints = {
         'exportVar' : null
         //'cmd' : jobOpt.cmd,
         //'script' : jobOpt.script,
@@ -603,23 +603,60 @@ var lookup = function(jobOpt) {
        // 'modules' : jobOpt.modules,
         //'tagTask' : jobOpt.tagTask
     };
-    jobLib.inputsMapper(jobOpt.inputs).on('mapped', function(refLitteral) {
+    jobLib.inputMapper(jobOpt.inputs).on('mapped', function(refLitteral) {
 
-        async.filter(warehouse.getWorkDir(constraints), function(workFolder, callback) {
-            jobLib.inputMapper(inputFileToLitteral(workFolder)).on('mapped', function(currLitteral){
-                if(!deepEqual(refLitteral, currLitteral))  callback(null, false);
-
-
+        async.detect(warehouse.getWorkDir(constraints),
+            function(workFolder, callback) {
+                jobLib.inputMapper(inputFileToLitteral(workFolder))
+                    .on('mapped', function(currLitteral){
+                        // Check inputs identity
+                        if(!deepEqual(refLitteral, currLitteral)) callback(null, false);
+                        // Check output validity
+                        callback(null, _stdioFileStatus(workFolder));
+                    });
         },
-        function(err, results) {
-            emiter.emit('known')
+        function(err, validWorkFolder) {
+            if (!validWorkFolder){
+                emiter.emit('unknown');
+            }
+            else emiter.emit('known', validWorkFolder);
         }
         );
 
     });
     return emiter;
 }
-*/
+
+var _extractJobID = function (workDir) {
+    var re = /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/ig;
+    var match = workDir.match(re);
+    return match.pop();
+}
+
+var _stdioFileStatus = function (workDir) {
+
+    var jid = _extractJobID(workDir);
+
+    var stderrFile = workDir + '/' + jid + '.err';
+
+    try {
+        var stats = fs.statSync(stderrFile);
+    } catch(err) {
+        console.log(stderrFile + ' not found');
+        return false;
+    }
+    if(stats.size > 0) return false;
+
+    var stdoutFile = workDir + '/' + jid + '.out';
+    try{
+        jsonfile.readFileSync(stdoutFile);
+    } catch(e) {
+        console.log(stdoutFile + " not found or no JSON");
+        return false;
+    }
+    return true;
+}
+
 var inputFileToLitteral = function (folderPath) {
     console.log("<>" + folderPath);
     var litt = {}

@@ -1,5 +1,5 @@
 var events = require('events');
-var uuid = require('node-uuid');
+const uuid = require('uuid/v4');
 var fs = require('fs');
 var spawn = require('child_process').spawn;
 var mkdirp = require('mkdirp');
@@ -7,6 +7,7 @@ const util = require('util');
 const isStream = require('is-stream');
 var path = require("path");
 var Readable = require('stream').Readable;
+
 
 
 /* The jobObject behaves like an emitter
@@ -22,7 +23,13 @@ var Readable = require('stream').Readable;
  *          'submitted', {Object}job;
  *          'completed', {Stream}stdio, {Stream}stderr, {Object}job // this event raising is delegated to jobManager
  */
+/*
 
+https://stackoverflow.com/questions/29072331/putting-data-back-onto-a-readable-stream
+create a whole new stream object pipe in the previousstream
+restore the previous stream to its intial state.
+
+*/
 
 var inputsMapper = function (inputLitt) {
     var newLitt = {};
@@ -32,6 +39,8 @@ var inputsMapper = function (inputLitt) {
     var emitter = new events.EventEmitter();
 
     function spit(inputValue, symbol) {
+
+
         var stream = null;
         if (util.isString(inputValue)) { // Input is a string
             if (fs.existsSync(inputValue)) { // Input is a path to file, create a stream from its content
@@ -43,17 +52,25 @@ var inputsMapper = function (inputLitt) {
             }
         } else if (isStream(inputValue)) { // Input value is already a stream
             stream = inputValue;
+            console.log("found a stream");
+            console.log("Current Symbol " + symbol);
+            console.dir(stream);
         }
 
         stream.on('data',function(d){
+            console.log("data, Current Symbol " + symbol);
             newLitt[symbol] += d.toString();
+            console.log(d.toString());
         })
         .on('end', function(){
             nTotal--;
+            console.log(symbol + "-->" +  nTotal);
             if(nTotal == 0) emitter.emit('mapped', newLitt);
         });
 
     };
+
+    console.log(inputLitt);
 
     for (var symbol in inputLitt) {
         newLitt[symbol] = '';
@@ -151,13 +168,13 @@ var batchDumper = function(job) {
 var Core = function(opt) {
     if (!opt)  {
         console.log("generating random id");
-        this.id = uuid.v4();
+        this.id = uuid();
     } else if (!opt.hasOwnProperty('id')) {
         console.log("generating random id..");
-        this.id = uuid.v4();
+        this.id = uuid();
     } else if (!opt.id) {
         console.log("generating random id..");
-        this.id = uuid.v4();
+        this.id = uuid();
     } else {
         this.id = opt.id;
     }
@@ -284,7 +301,6 @@ where key are SYMBOL which will be used in two ways
 Job.prototype.setInput = function() {
     var self = this;
 
-
     // Following two conditions are not async
     if (!this.inputs) {
         self.emit("inputSet");
@@ -296,7 +312,9 @@ Job.prototype.setInput = function() {
         self.emit("inputSet");
         return;
     }
-
+    console.log("Setting up");
+    //console.dir(this.inputs);
+    console.log("----");
     var stream = null;
     inputsMapper(this.inputs).on('mapped', function(inputsAsStringLitt) {
         console.log(inputsAsStringLitt);
@@ -307,6 +325,7 @@ Job.prototype.setInput = function() {
             fs.writeFileSync(dumpFile, fileContent);
             self.inputSymbols[symbol] = dumpFile;
         }
+        console.log("ISS");
         self.emit("inputSet");
     });
     return;
@@ -370,6 +389,7 @@ Job.prototype.submit = function(fname)  {
 }
 
 Job.prototype.fork = function(fname) {
+    console.log("forked");
     var submitArgArray = [fname];
     if (this.debugBool)
         console.log('local [' + this.workDir + '] forking w/ sh ' + submitArgArray);

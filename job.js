@@ -8,6 +8,7 @@ const isStream = require('is-stream');
 var path = require("path");
 var Readable = require('stream').Readable;
 
+var debugMode = false;
 
 
 /* The jobObject behaves like an emitter
@@ -23,6 +24,8 @@ var Readable = require('stream').Readable;
  *          'submitted', {Object}job;
  *          'completed', {Stream}stdio, {Stream}stderr, {Object}job // this event raising is delegated to jobManager
  */
+
+
 /*
 
 https://stackoverflow.com/questions/29072331/putting-data-back-onto-a-readable-stream
@@ -31,53 +34,60 @@ restore the previous stream to its intial state.
 
 */
 
+/*
+ * Transfer all inputs in a unique literal, whatever their type (string, path or stream)
+ */
 var inputsMapper = function (inputLitt) {
     var newLitt = {};
-
+    var emitter = new events.EventEmitter();
     var nTotal = Object.keys(inputLitt).length;
 
-    var emitter = new events.EventEmitter();
+    if (debugMode) {
+        console.log("nTotal = " + nTotal + ", inputLitt : ");
+        console.dir(inputLitt);
+    }
 
     function spit(inputValue, symbol) {
-
-
+        if (debugMode) console.log("Current Symbol " + symbol);
+        var type = null;
         var stream = null;
+
         if (util.isString(inputValue)) { // Input is a string
             if (fs.existsSync(inputValue)) { // Input is a path to file, create a stream from its content
-                stream = fs.createReadStream(inputValue)
+                stream = fs.createReadStream(inputValue) // if var using stream == null
             } else { // A simple string to wrap in a stream
                 stream = new Readable();
                 stream.push(inputValue);
                 stream.push(null);
             }
         } else if (isStream(inputValue)) { // Input value is already a stream
+            type = 'stream';
+            stream = new Readable();
             stream = inputValue;
-            console.log("found a stream");
-            console.log("Current Symbol " + symbol);
-            console.dir(stream);
         }
 
         stream.on('data',function(d){
-            console.log("data, Current Symbol " + symbol);
             newLitt[symbol] += d.toString();
-            console.log(d.toString());
         })
         .on('end', function(){
             nTotal--;
-            console.log(symbol + "-->" +  nTotal);
-            if(nTotal == 0) emitter.emit('mapped', newLitt);
+            if (type === 'stream') {
+                // create a new stream to recycle inputValue, so it can be readded as much as necessary
+                var recycleStream = new Readable();
+                recycleStream.push(newLitt[symbol]);
+                recycleStream.push(null);
+                inputLitt[symbol] = recycleStream;
+            }
+            if (nTotal == 0) emitter.emit('mapped', newLitt);
         });
 
     };
-
-    console.log(inputLitt);
 
     for (var symbol in inputLitt) {
         newLitt[symbol] = '';
         var inputValue = inputLitt[symbol];
         spit(inputValue, symbol);
     }
-    //return inputLitt
     return emitter;
 }
 
@@ -133,10 +143,11 @@ var batchDumper = function(job) {
         }
     }
 
-
-    job.modules.forEach(function(e) {
-        batchContentString += "module load " + e;
-    });
+    if (job.modules) {
+        job.modules.forEach(function(e) {
+            batchContentString += "module load " + e;
+        });
+    }
 
     if (job.script) {
         var fname = job.workDir + '/' + job.id + '_coreScript.sh';
@@ -314,9 +325,10 @@ Job.prototype.setInput = function() {
     }
     console.log("Setting up");
     //console.dir(this.inputs);
-    console.log("----");
+    console.log("-----------------------------------------------------------------");
     var stream = null;
     inputsMapper(this.inputs).on('mapped', function(inputsAsStringLitt) {
+        console.log('inputsAsStringLitt :')
         console.log(inputsAsStringLitt);
         var nTotal = Object.keys(inputsAsStringLitt).length;
         for (var symbol in inputsAsStringLitt) {
@@ -472,7 +484,9 @@ Job.prototype.stderr = function() {
         bErr = false;
     }
     if (!bErr) return null;
-    if (statErr.size === 0) return null;
+    if (statErr.size === 0) {
+        return null;
+    }
 
     var stream = fs.createReadStream(this.workDir + '/' + fNameStderr);
     return stream;
@@ -482,5 +496,6 @@ module.exports = {
         j = new Job(opt);
         return j;
     },
+    debugOn : function() { debugMode = true; },
     inputMapper : inputsMapper
 };

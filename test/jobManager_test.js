@@ -27,6 +27,12 @@ var scriptBatchTest = function(opt) {
     s.push("This is a stream content test");
     s.push(null);
     jobOpt.inputs["streamInputSymbol"] = s;
+
+    var t = new Readable();
+    t.push("stream content");
+    t.push(null);
+    jobOpt.inputs["anInput"] = t;
+
     var testJob = jobManager.push(bean.test.keyProfile, jobOpt);
     testJob.on("completed", function(stdout, stderr, jObj) {
         var content = 'stdout content:\n';
@@ -157,11 +163,32 @@ engineType = engineType ? engineType : bean.engineType;
 if (indexTestBool) {
     optCacheDir.push(bean.cacheDir);
     jobManager.index(optCacheDir);
-    var testPath = jobManager.getWorkDir({ 'cmd' : null });
-    console.log("Retrieve job work folders\n" + testPath);
+    
+    var constraints = { 'cmd' : null };
+    var testPath = jobManager.getWorkDir(constraints);
+    console.log("Retrieve job work folders for the constraints : ")
+    console.dir(constraints);
+    console.log(testPath);
+    
     console.log("-------------------\n");
-    testPath = jobManager.getWorkDir({ 'script' : './dummyJob/dummyJob.sh' });
-    console.log("Retrieve job work folders\n" + testPath);
+
+    constraints = { 'script' : './dummyJob/dummyJob.sh' };
+    testPath = jobManager.getWorkDir(constraints);
+    console.log("Retrieve job work folders for the constraints : ")
+    console.dir(constraints);
+    console.log(testPath);
+
+    var constraints = { 'cmd' : null };
+    var testPath = jobManager.getWorkDir(constraints);
+    console.log("Retrieve job work folders for the constraints : ")
+    console.dir(constraints);
+    console.log(testPath);
+
+    constraints = { 'script' : './dummyJob/dummyJob2.sh' };
+    testPath = jobManager.getWorkDir(constraints);
+    console.log("Retrieve job work folders for the constraints : ")
+    console.dir(constraints);
+    console.log(testPath);
 }
 
 

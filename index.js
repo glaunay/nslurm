@@ -11,6 +11,8 @@ var slurmLib = require('./lib/slurm');
 var emulatorLib = require('./lib/emulator');
 var async = require('async');
 var deepEqual = require('deep-equal');
+var jsonfile = require('jsonfile');
+
 
 var engine = null;
 
@@ -152,6 +154,9 @@ module.exports = {
      * getWorkDir(constraints) // contrainst on jobID.json, returns null or Array of workingdirecory
      */
 
+
+    /*
+    NOT NECESSARY ?
     findTaskDir: function(tagTask) {
         if (!tagTask) throw 'ERROR : no tag task specified !';
         // convention of writing the task directory name
@@ -205,6 +210,8 @@ module.exports = {
         });
         return taskDirs;
     },
+    */
+
 
     /**
      * Display on console.log the current list of "pushed" jobs and their status
@@ -308,17 +315,20 @@ module.exports = {
             "cmd": 'cmd' in jobOpt ? jobOpt.cmd : null,
             "inputs": 'inputs' in jobOpt ? jobOpt.inputs : [],
             "exportVar" : 'exportVar' in jobOpt ? jobOpt.exportVar : null,
+            "modules" : 'modules' in jobOpt ? jobOpt.modules : null,
             "tagTask": 'tagTask' in jobOpt ? jobOpt.tagTask : null
         };
 
-
         var newJob = jobLib.createJob(jobTemplate);
 
-        lookup(jobTemplate).on('known', function() {
-                console.log("I CAN RESURRECT YOU");
+        var constraints = extractConstraints(jobTemplate);
+
+        lookup(jobTemplate, constraints).on('known', function(validWorkFolder) {
+                console.log("I CAN RESURRECT YOU : " + validWorkFolder);
+                _resurrect(newJob, validWorkFolder);
             })
             .on('unknown', function() {
-                console.log("gogo");
+                console.log("########## No previous equal job found ##########");
                 newJob.start();
 
                 jobsArray[jobID] = {
@@ -340,17 +350,6 @@ module.exports = {
                 })
 
             })
-
-/*
-          jobsArray[jobID] = {
-                    'obj': newJob,
-                    'status': 'CREATED',
-                    'nCycle': 0
-                };
-
-
-        newJob.start();
-*/
 
         exhaustBool = true;
         //console.log(jobsArray);
@@ -447,6 +446,7 @@ module.exports = {
     debugOn : function() {
         debugMode = true;
         warehouse.debugOn();
+        jobLib.debugOn();
     },
 
     set_id: function(val) {
@@ -459,6 +459,8 @@ module.exports = {
 };
 
 
+// WARNING : MG and GL 05.09.2017 : memory leak :
+// the delete at the end of the function is ok but another reference to the job can still exists [***]
 function ttlTest(curr_job) {
     if (!curr_job.obj.ttl) return;
 
@@ -469,7 +471,7 @@ function ttlTest(curr_job) {
         console.log("TTL exceeded for Job " + jid + ", terminating it");
         engine.kill([curr_job.obj]).on('cleanExit', function(){
             if(jid in jobsArray)
-                delete jobsArray[jid];
+                delete jobsArray[jid]; //  [***]
         }); // Emiter is passed here if needed
     }
 }
@@ -539,7 +541,47 @@ function _pull(jid) {
 };
 
 /*
- We  treat error state emission / document it for calling scope
+Resurrect an old job according to its @workDir, by modifying the reference to @jobObj
+*/
+function _resurrect (jobObj, workDir) {
+    if (debugMode) {
+        console.log("trying to resurrect the job at : " + workDir)
+    }
+    jobObj.workDir = workDir;
+    jobObj.id = _extractJobID(workDir);
+    if (debugMode) {
+        console.log("the job looks like :")
+        console.dir(jobObj);
+    }
+
+    var stdout = jobObj.stdout();
+    var stderr = jobObj.stderr();
+    if (jobObj.emulated) {
+        async.parallel([function(callback) {
+                            var fOut = jobObj.workDir + '/' + jobObj.id + '.err';
+                            var errStream = fs.createWriteStream(fOut);
+                            stderr.pipe(errStream).on('close', function() {
+                                callback(null, fOut);
+                            });
+                        }, function(callback) {
+                            var fOut = jobObj.workDir + '/' + jobObj.id + '.out';
+                            var outStream = fs.createWriteStream(fOut);
+                            stdout.pipe(outStream).on('close', function() {
+                                callback(null, fOut);
+                            });
+                        }], // Once all stream have been consumed, get filesnames
+                        function(err,results) {
+                            var _stdout = fs.createReadStream(results[1]);
+                            var _stderr = fs.createReadStream(results[0]);
+                             jobObj.emit("completed", _stdout, _stderr, jobObj);
+                        });
+    } else {
+        jobObj.emit("completed", stdout, stderr, jobObj);
+    }
+}
+
+/*
+ We treat error state emission / document it for calling scope
 */
 function _storeAndEmit(jid, status) {
     var jRef = jobsArray[jid];
@@ -583,6 +625,29 @@ function _storeAndEmit(jid, status) {
 }
 
 /*
+    Extract the constraints of the job from its @jobOpt according these rules :
+        - use obligatory either a script or a cmd (otherwise error) [1]
+        - use a tagTask : value or none (optional) [2]
+        - use the literal exportVar : value or none (optional) [3]
+*/
+var extractConstraints = function (jobOpt) {
+    var constraints = {};
+    // [1]
+    if (jobOpt.hasOwnProperty('script')) constraints['script'] = jobOpt.script;
+    else if (jobOpt.hasOwnProperty('cmd')) constraints['cmd'] = jobOpt.cmd;
+    else console.log('ERROR in extractConstraints : neither script nor cmd specified');
+    // [2]
+    if (jobOpt.hasOwnProperty('tagTask') && jobOpt.tagTask !== null)
+        constraints['tagTask'] = jobOpt.tagTask;
+    // [3]
+    if (jobOpt.hasOwnProperty('exportVar') && jobOpt.exportVar !== null)
+        constraints['exportVar'] = jobOpt.exportVar;
+    return constraints;
+}
+
+
+
+/*
     getWorkDir of all but inputs constraints.
     browse the workingDir list
     parse key and filenames from input subfolders
@@ -592,39 +657,45 @@ function _storeAndEmit(jid, status) {
     job.inputMapper(jobOpt.inputs) and aforementioned litteral
 */
 
-var lookup = function(jobOpt) {
+var lookup = function(jobOpt, constraints) {
     var emiter = new events.EventEmitter();
-    /* The only constraints taken into account by warehouse */
-    var constraints = {
-        'exportVar' : null
-        //'cmd' : jobOpt.cmd,
-        //'script' : jobOpt.script,
-        //'exportVar' : jobOpt.exportVar,
-       // 'modules' : jobOpt.modules,
-        //'tagTask' : jobOpt.tagTask
-    };
-    jobLib.inputMapper(jobOpt.inputs).on('mapped', function(refLitteral) {
+    if (debugMode) {
+        console.log("lookup thanks to this jobOpt :");
+        console.dir(jobOpt);
+        console.log("with the following constraints :");
+        console.dir(constraints);
+    }
 
-        async.detect(warehouse.getWorkDir(constraints),
-            function(workFolder, callback) {
-                jobLib.inputMapper(inputFileToLitteral(workFolder))
-                    .on('mapped', function(currLitteral){
-                        // Check inputs identity
-                        if(!deepEqual(refLitteral, currLitteral)) callback(null, false);
-                        // Check output validity
-                        callback(null, _stdioFileStatus(workFolder));
-                    });
-        },
-        function(err, validWorkFolder) {
-            if (!validWorkFolder){
+    jobLib.inputMapper(jobOpt.inputs).on('mapped', function (refLitteral) {
+        async.detect(warehouse.getWorkDir(constraints), function (workFolder, callback) {
+            // WARNING USING async.detect() -> the callback cannot be called two times for one iteration
+            jobLib.inputMapper(inputFileToLitteral(workFolder)).on('mapped', function (currLitteral) {
+                if(!_literalEqual(refLitteral, currLitteral)) { // Check inputs identity
+                    callback(null, false);
+                } else { // Check output validity
+                    callback(null, _stdioFileStatus(workFolder));
+                }
+            });
+        }, function(err, validWorkFolder) {
+            if (!validWorkFolder) {
                 emiter.emit('unknown');
+            } else {
+                emiter.emit('known', validWorkFolder);
             }
-            else emiter.emit('known', validWorkFolder);
-        }
-        );
+        });
 
     });
     return emiter;
+}
+
+var _literalEqual = function (lit1, lit2) {
+    if (deepEqual(lit1, lit2)) {
+        if (debugMode) console.log("literals are equal");
+        return true;
+    } else {
+        if (debugMode) console.log("literals are not equal");
+        return false;
+    }
 }
 
 var _extractJobID = function (workDir) {
@@ -634,23 +705,22 @@ var _extractJobID = function (workDir) {
 }
 
 var _stdioFileStatus = function (workDir) {
-
     var jid = _extractJobID(workDir);
 
     var stderrFile = workDir + '/' + jid + '.err';
 
     try {
         var stats = fs.statSync(stderrFile);
-    } catch(err) {
+    } catch (err) {
         console.log(stderrFile + ' not found');
         return false;
     }
     if(stats.size > 0) return false;
 
     var stdoutFile = workDir + '/' + jid + '.out';
-    try{
+    try {
         jsonfile.readFileSync(stdoutFile);
-    } catch(e) {
+    } catch (e) {
         console.log(stdoutFile + " not found or no JSON");
         return false;
     }

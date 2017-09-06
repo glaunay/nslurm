@@ -1,7 +1,8 @@
 {   "comments" : "template to test basic script submission functionality",
     "exportVar" : {
-        "dummyType" : "fabulous Fable"
+        "dummyType" : "toto"
     },
-    "inputs" : {"fileInputSymbol" : "./dummyJob/input1.txt", "stringInputSymbol" : "EatMeDrinkMe"},
-    "script" : "./dummyJob/dummyJob.sh"
+    "inputs" : {"fileInputSymbol" : "./dummyJob/input1.txt",
+    			"stringInputSymbol" : "EatMeDrinkMe"},
+    "script" : "./dummyJob/dummyJob_stdoutJSON.sh"
 }

@@ -12,6 +12,7 @@ var emulatorLib = require('./lib/emulator');
 var async = require('async');
 var deepEqual = require('deep-equal');
 var jsonfile = require('jsonfile');
+var fs_extra = require('fs-extra');
 
 
 var engine = null;
@@ -347,7 +348,16 @@ module.exports = {
                 }).on('jobStart', function(job) {
                     // next lines for tests on squeueReport() :
                     engine.list()
-                })
+                }).on('scriptReadError', function (err, job) {
+                    console.error('ERROR while reading the script : ');
+                    console.error(err);
+                }).on('scriptWriteError', function (err, job) {
+                    console.error('ERROR while writing the coreScript : ');
+                    console.error(err);
+                }).on('scriptSetPermissionError', function (err, job) {
+                    console.error('ERROR while trying to set permissions of the coreScript : ');
+                    console.error(err);
+                });
 
             })
 
@@ -547,8 +557,11 @@ function _resurrect (jobObj, workDir) {
     if (debugMode) {
         console.log("trying to resurrect the job at : " + workDir)
     }
+
+    fs_extra.copySync(workDir, jobObj.workDir); // copy all the files of the resurrected job //!\\ see with GL
     jobObj.workDir = workDir;
     jobObj.id = _extractJobID(workDir);
+
     if (debugMode) {
         console.log("the job looks like :")
         console.dir(jobObj);

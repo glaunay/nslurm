@@ -33,7 +33,8 @@ var scriptBatchTest = function(opt) {
     t.push(null);
     jobOpt.inputs["anInput"] = t;
 
-    var testJob = jobManager.push(bean.test.keyProfile, jobOpt);
+    //var testJob = jobManager.push(bean.test.keyProfile, jobOpt);
+    var testJob = jobManager.push(null, jobOpt); // to test without jobProfile
     testJob.on("completed", function(stdout, stderr, jObj) {
         var content = 'stdout content:\n';
         stdout.on('data', function(buf) { content += buf.toString(); });

@@ -1,6 +1,10 @@
 {
     "comments": "Definition of slurms set of preprocessors options values",
     "definitions": {
+        "default": {
+            "partition": "medium-mobi",
+            "qos": "medium-mobi"
+        },
         "arwen_gpu": {
             "partition": "gpu_dp",
             "qos": "gpu"

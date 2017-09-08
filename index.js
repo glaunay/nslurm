@@ -12,7 +12,6 @@ var emulatorLib = require('./lib/emulator');
 var async = require('async');
 var deepEqual = require('deep-equal');
 var jsonfile = require('jsonfile');
-var fs_extra = require('fs-extra');
 
 
 var engine = null;
@@ -558,7 +557,6 @@ function _resurrect (jobObj, workDir) {
         console.log("trying to resurrect the job at : " + workDir)
     }
 
-    fs_extra.copySync(workDir, jobObj.workDir); // copy all the files of the resurrected job //!\\ see with GL
     jobObj.workDir = workDir;
     jobObj.id = _extractJobID(workDir);
 

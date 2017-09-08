@@ -646,8 +646,8 @@ function _storeAndEmit(jid, status) {
 var extractConstraints = function (jobOpt) {
     var constraints = {};
     // [1]
-    if (jobOpt.hasOwnProperty('script')) constraints['script'] = jobOpt.script;
-    else if (jobOpt.hasOwnProperty('cmd')) constraints['cmd'] = jobOpt.cmd;
+    if (jobOpt.hasOwnProperty('script') && jobOpt.script !== null) constraints['script'] = jobOpt.script;
+    else if (jobOpt.hasOwnProperty('cmd') && jobOpt.cmd !== null) constraints['cmd'] = jobOpt.cmd;
     else console.log('ERROR in extractConstraints : neither script nor cmd specified');
     // [2]
     if (jobOpt.hasOwnProperty('tagTask') && jobOpt.tagTask !== null)

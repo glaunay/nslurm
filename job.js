@@ -105,10 +105,11 @@ var _copyScript = function(job, fname /*, string*/ , emitter) {
     });
     wr.on("close", function() {
         fs.chmod(fname, '777', function(err) {
-            if (err)
+            if (err) {
                 job.emit('scriptSetPermissionError', err, job);
-            else
+            } else {
                 emitter.emit('scriptReady' /*, string*/ );
+            }
         });
     });
     src.pipe(wr);
@@ -137,6 +138,7 @@ var batchDumper = function(job) {
             batchContentString += key + '="' + job.exportVar[key] + '"\n';
         }
     }
+
     if (job.inputSymbols) {
         for (var key in job.inputSymbols) {
             batchContentString += key + '="' + job.inputSymbols[key] + '"\n';
@@ -145,7 +147,7 @@ var batchDumper = function(job) {
 
     if (job.modules) {
         job.modules.forEach(function(e) {
-            batchContentString += "module load " + e;
+            batchContentString += "module load " + e + '\n';
         });
     }
 
@@ -334,7 +336,11 @@ Job.prototype.setInput = function() {
         for (var symbol in inputsAsStringLitt) {
             var fileContent = inputsAsStringLitt[symbol];
             var dumpFile = self.workDir + '/input/' + symbol + '.inp';
-            fs.writeFileSync(dumpFile, fileContent);
+            try {
+                fs.writeFileSync(dumpFile, fileContent);
+            } catch (err) {
+                console.error(err);
+            }
             self.inputSymbols[symbol] = dumpFile;
         }
         console.log("ISS");

@@ -28,6 +28,11 @@
             "qos": "ws_dev",
             "gid": "ws_users",
             "uid": "ws_ardock"
+        },
+        "arwen_hex_16cpu": {
+            "partition": "mpi-mobi",
+            "qos": "mpi-mobi",
+            "nCores": 16
         }
     }
 }

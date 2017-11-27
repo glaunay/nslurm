@@ -325,13 +325,13 @@ Job.prototype.setInput = function() {
         self.emit("inputSet");
         return;
     }
-    console.log("Setting up");
-    //console.dir(this.inputs);
-    console.log("-----------------------------------------------------------------");
+    // console.log("Setting up");
+    // console.dir(this.inputs);
+    // console.log("-----------------------------------------------------------------");
     var stream = null;
     inputsMapper(this.inputs).on('mapped', function(inputsAsStringLitt) {
-        console.log('inputsAsStringLitt :')
-        console.log(inputsAsStringLitt);
+        // console.log('inputsAsStringLitt :')
+        // console.log(inputsAsStringLitt);
         var nTotal = Object.keys(inputsAsStringLitt).length;
         for (var symbol in inputsAsStringLitt) {
             var fileContent = inputsAsStringLitt[symbol];
@@ -343,7 +343,7 @@ Job.prototype.setInput = function() {
             }
             self.inputSymbols[symbol] = dumpFile;
         }
-        console.log("ISS");
+        // console.log("ISS");
         self.emit("inputSet");
     });
     return;
@@ -499,7 +499,7 @@ Job.prototype.stderr = function() {
 }
 module.exports = {
     createJob: function(opt) {
-        j = new Job(opt);
+        let j = new Job(opt);
         return j;
     },
     debugOn : function() { debugMode = true; },

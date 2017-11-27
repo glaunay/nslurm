@@ -13,6 +13,8 @@ var async = require('async');
 var deepEqual = require('deep-equal');
 var jsonfile = require('jsonfile');
 
+var heapdump = require('heapdump');
+
 
 var engine = null;
 
@@ -101,6 +103,36 @@ var drawJobNumber = function() {
 }
 
 /**
+ * Display on console.log the current list of "pushed" jobs and their status
+ *
+ * @param  None
+ * @return null
+ */
+var jobsView = function() {
+    var displayString = '###############################\n' + '###### Current jobs pool ######\n' + '###############################\n';
+    var c = 0;
+    for (var key in jobsArray) {;
+        c++;
+        displayString += '# ' + key + ' : ' + jobsArray[key].status + '\n';
+    }
+    if (c === 0)
+        displayString += '          EMPTY               \n';
+    console.log(displayString);
+    return null;
+
+}
+
+/*
+* Memory leak : function for debugging
+*/
+var debugMemory = function () {
+    console.log("DEBUG MEMORY - JOBS VIEW :");
+    jobsView();
+    console.log("DEBUG MEMORY - PRINT MEMORY :");
+    printMemory();
+}
+
+/**
  * Returns the set of current jobs in an Array
  *
  * @param  None
@@ -114,6 +146,7 @@ var _getCurrentJobList = function() {
     return jobObjList;
 }
 module.exports = {
+    jobsView : jobsView,
     index : warehouse.index,
     getWorkDir : warehouse.getWorkDir,
     engine: function() {
@@ -212,27 +245,6 @@ module.exports = {
     },
     */
 
-
-    /**
-     * Display on console.log the current list of "pushed" jobs and their status
-     *
-     * @param  None
-     * @return null
-     */
-    jobsView: function() {
-        var displayString = '###############################\n' + '###### Current jobs pool ######\n' + '###############################\n';
-        var c = 0;
-        for (var key in jobsArray) {;
-            c++;
-            displayString += '# ' + key + ' : ' + jobsArray[key].status + '\n';
-        }
-        if (c === 0)
-            displayString += '          EMPTY               \n';
-        console.log(displayString);
-        return null;
-
-    },
-
     /*
      * Call the engine processes listing function
      * @param  None
@@ -323,8 +335,9 @@ module.exports = {
 
         var constraints = extractConstraints(jobTemplate);
 
-        lookup(jobTemplate, constraints).on('known', function(validWorkFolder) {
-                console.log("I CAN RESURRECT YOU : " + validWorkFolder);
+        lookup(jobTemplate, constraints)
+            .on('known', function(validWorkFolder) {
+                console.log("I CAN RESURRECT YOU : " + validWorkFolder + ' -> ' + jobTemplate.tagTask);
                 _resurrect(newJob, validWorkFolder);
             })
             .on('unknown', function() {
@@ -340,7 +353,7 @@ module.exports = {
                     self.jobsView();
 
                 newJob.emitter.on('submitted', function(j) {
-                    //console.log(j);
+                    console.log(j);
                     jobsArray[j.id].status = 'SUBMITTED';
                     if (debugMode)
                         self.jobsView();
@@ -364,11 +377,9 @@ module.exports = {
         //console.log(jobsArray);
 
         return newJob;
-
-        //return jobsArray[jobID]
-
-        //return newJob.emitter;
     },
+
+
     /**
      * Starts the job manager
      *
@@ -568,6 +579,7 @@ function _resurrect (jobObj, workDir) {
     var stdout = jobObj.stdout();
     var stderr = jobObj.stderr();
     if (jobObj.emulated) {
+        console.log("emulated toto")
         async.parallel([function(callback) {
                             var fOut = jobObj.workDir + '/' + jobObj.id + '.err';
                             var errStream = fs.createWriteStream(fOut);
@@ -584,7 +596,7 @@ function _resurrect (jobObj, workDir) {
                         function(err,results) {
                             var _stdout = fs.createReadStream(results[1]);
                             var _stderr = fs.createReadStream(results[0]);
-                             jobObj.emit("completed", _stdout, _stderr, jobObj);
+                            jobObj.emit("completed", _stdout, _stderr, jobObj);
                         });
     } else {
         jobObj.emit("completed", stdout, stderr, jobObj);
@@ -656,6 +668,13 @@ var extractConstraints = function (jobOpt) {
     return constraints;
 }
 
+var printMemory = function () {
+    let used = process.memoryUsage();
+    for (let key in used) {
+        console.log(`${key} ${Math.round(used[key] / 1024 / 1024 * 100) / 100} MB`);
+    }
+}
+
 
 
 /*
@@ -678,7 +697,7 @@ var lookup = function(jobOpt, constraints) {
     }
 
     jobLib.inputMapper(jobOpt.inputs).on('mapped', function (refLitteral) {
-        async.detect(warehouse.getWorkDir(constraints), function (workFolder, callback) {
+        async.detectSeries(warehouse.getWorkDir(constraints), function (workFolder, callback) {
             // WARNING USING async.detect() -> the callback cannot be called two times for one iteration
             jobLib.inputMapper(inputFileToLitteral(workFolder)).on('mapped', function (currLitteral) {
                 if(!_literalEqual(refLitteral, currLitteral)) { // Check inputs identity
@@ -739,7 +758,7 @@ var _stdioFileStatus = function (workDir) {
 }
 
 var inputFileToLitteral = function (folderPath) {
-    console.log("<>" + folderPath);
+    //console.log("<>" + folderPath);
     var litt = {}
     fs.readdirSync(folderPath + '/input').map(function(file){
         file = folderPath+ '/input/' + file;

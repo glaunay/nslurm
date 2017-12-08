@@ -305,14 +305,22 @@ module.exports = {
                 scriptWriteError
                 scriptSetPermissionError
      */
-    push: function(jobProfileString, jobOpt) {
+    push: function(jobProfileString, jobOpt, namespace) {
         /*console.log("jobProfile: " + jobProfileString + "\njobOpt:\n");
         console.log(jobOpt);*/
         var jobID = drawJobNumber();
         var self = this;
         /* Define the new job parameters */
         // We now expect an inputs parameter which has to be a list
-        var workDir = cacheDir + '/' + jobID;
+        var workDir;
+        if (namespace) {
+            try { fs.mkdirSync(cacheDir + '/' + namespace); }
+            catch (err) {
+                if (err.code != 'EEXIST') throw err;
+                console.log("Namespace " + cacheDir + '/' + namespace + ' already exists.');
+            }
+            workDir = cacheDir + '/' + namespace + '/' + jobID;
+        }
         var jobTemplate = {
             "debugMode" : debugMode,
             "id": jobID,

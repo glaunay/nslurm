@@ -233,6 +233,7 @@ var Job = function(opt) {
     this.port = opt.port;
     this.adress = opt.adress;
     this.workDir = opt.workDir;
+    this.namespace = opt.namespace ? opt.namespace : null;
 
     this.cwd = 'cwd' in opt ? opt.cwd : null;
     this.cwdClone = 'cwdClone' in opt ? opt.cwdClone : false;

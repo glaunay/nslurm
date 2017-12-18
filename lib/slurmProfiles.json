@@ -24,10 +24,18 @@
             "uid": "ws_ardock"
         },
         "arwen-dev_cpu": {
-            "partition": "ws_dev",
-            "qos": "ws_dev",
+            "partition": "ws-dev",
+            "qos": "ws-dev",
             "gid": "ws_users",
             "uid": "ws_ardock"
+        },
+        "arwen-dev_hex_16cpu": {
+            "partition": "ws-dev",
+            "qos": "ws-dev",
+            "gid": "ws_users",
+            "uid": "ws_ardock",
+            "nNodes": 1,
+            "nCores": 16
         },
         "arwen_hex_16cpu": {
             "partition": "mpi-mobi",

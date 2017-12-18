@@ -5,9 +5,9 @@
     "tcp": "192.168.117.151",
     "cacheDir": "/data/dev/ardock/tmp/persistantNslurmCache_dvl/",
     "binaries": {
-        "cancelBin": "/opt/slurm/bin/scancel",
-        "submitBin": "/opt/slurm/bin/sbatch",
-        "queueBin": "/opt/slurm/bin/squeue"
+        "cancelBin": "/data/www_dev/ardock/bin/slurm/bin/scancel",
+        "submitBin": "/data/www_dev/ardock/bin/slurm/bin/sbatch",
+        "queueBin": "/data/www_dev/ardock/bin/slurm/bin/squeue"
     },
     "test": {
         "keyProfile": "arwen-dev_cpu",

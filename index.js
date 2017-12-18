@@ -272,10 +272,11 @@ module.exports = {
                     curr_job.obj.MIA_jokers -= 1;
                     console.log('The job "' + key + '" missing from queue! Jokers left is ' + curr_job.obj.MIA_jokers);
                     if (curr_job.obj.MIA_jokers === 0) {
-                        var jobTmp = clone(curr_job); // deepcopy of the disappeared job
-                        jobTmp.obj.emitter = curr_job.obj.emitter; // keep same emitter reference
+                        //var jobTmp = clone(curr_job); // deepcopy of the disappeared job
+                        //jobTmp.obj.emitter = curr_job.obj.emitter; // keep same emitter reference
+                        let tmpJob = jobsArray[key];
                         delete jobsArray[key];
-                        jobTmp.obj.emitter.emit('lostJob', 'The job "' + key + '" is not in the queue !', jobTmp.obj);
+                        tmpJob.obj.emitter.emit('lostJob', 'The job "' + key + '" is not in the queue !', tmpJob.obj);
                     }
                 } else {
                     if (curr_job.obj.MIA_jokers < 3)

@@ -1,0 +1,18 @@
+{
+    "comments": "nslurm arwen-prod config file - prodVersion",
+    "engineType": "slurm",
+    "port": "2997",
+    "tcp": "192.168.117.150",
+    "cacheDir": "/data/prod/ardock/tmp/persistantNslurmCache_prod/",
+    "binaries": {
+        "cancelBin": "/data/www/ardock/bin/slurm/bin/scancel",
+        "submitBin": "/data/www/ardock/bin/slurm/bin/sbatch",
+        "queueBin": "/data/www/ardock/bin/slurm/bin/squeue"
+    },
+    "test": {
+        "keyProfile": "arwen-dev_cpu",
+        "jobSettings": {
+            "cmd": "sleep 20;echo \"This is stdout of test job\""
+        }
+    }
+}

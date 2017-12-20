@@ -1,6 +1,6 @@
 {
   "name": "nslurm",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "description": "A library to communicate with a slurm scheduler/engine on HPC",
   "main": "index.js",
   "scripts": {
@@ -24,7 +24,7 @@
     "clone": "^2.1.1",
     "deep-equal": "^1.0.1",
     "glob": "^7.1.2",
-	"heapdump": "^0.3.9",
+    "heapdump": "^0.3.9",
     "is-stream": "^1.1.0",
     "jsonfile": "^3.0.0",
     "mkdirp": "^0.5.1",

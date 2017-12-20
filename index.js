@@ -321,6 +321,8 @@ module.exports = {
                 console.log("Namespace " + cacheDir + '/' + namespace + ' already exists.');
             }
             workDir = cacheDir + '/' + namespace + '/' + jobID;
+        } else {
+            workDir = cacheDir + '/' + jobID;
         }
         var jobTemplate = {
             "debugMode" : debugMode,

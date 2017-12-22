@@ -29,9 +29,23 @@
             "gid": "ws_users",
             "uid": "ws_ardock"
         },
+        "arwen-prod_cpu": {
+            "partition": "ws-prod",
+            "qos": "ws-prod",
+            "gid": "ws_users",
+            "uid": "ws_ardock"
+        },
         "arwen-dev_hex_16cpu": {
             "partition": "ws-dev",
             "qos": "ws-dev",
+            "gid": "ws_users",
+            "uid": "ws_ardock",
+            "nNodes": 1,
+            "nCores": 16
+        },
+        "arwen-prod_hex_16cpu": {
+            "partition": "ws-prod",
+            "qos": "ws-prod",
             "gid": "ws_users",
             "uid": "ws_ardock",
             "nNodes": 1,

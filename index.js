@@ -364,7 +364,8 @@ module.exports = {
                     self.jobsView();
 
                 newJob.emitter.on('submitted', function(j) {
-                    console.log(j);
+                    if (debugMode)
+                        console.log(j);
                     jobsArray[j.id].status = 'SUBMITTED';
                     if (debugMode)
                         self.jobsView();

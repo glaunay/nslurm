@@ -13,8 +13,6 @@ var async = require('async');
 var deepEqual = require('deep-equal');
 var jsonfile = require('jsonfile');
 
-var heapdump = require('heapdump');
-
 
 var engine = null;
 
